@@ -1,0 +1,215 @@
+---
+output:
+  pdf_document:
+    keep_tex: false
+    fig_caption: yes
+    latex_engine: xelatex
+    template: ./template/template.tex
+geometry: margin=1in
+header-includes:
+   - \linespread{1.05}
+
+title: "Evaluating the Risk of the Troubled Families Programme Public Data Release"
+author: 201374125
+fontsize: 10pt
+bibliography: 
+    - /home/cjber/drive/bib/zbib.bib
+csl: /home/cjber/drive/bib/uol_cb.csl
+link-citations: yes
+---
+
+<!---
+Word count: `r wordcountaddin::word_count(rprojroot::thisfile())`
+--->
+
+# Introduction
+
+The Troubled Families Programme aims to provide a network of support for families suffering from multiple and complex problems, including parents who do not view work as an achievable goal, with children who have a serious risk of disadvantage [@departmentforcommunitiesandlocalgovernment2017a].
+
+This report concerns the publication of data associated with this programme for research purposes. Particularly, the goal with this data release is to evaluate the performance of this programme, and identify areas for improvement. The data is described in the _National Evaluation of the Troubled Families Programme 2015-2020_ Report by the Department for Communities and Local Government. **Table \ref{tab:nis}** gives an overview of the family data provided as part of this dataset, used in an evaluation of the programme. Each dataset concerns the same set of families, and smaller numbers are due to non matching to additional data. National Impact Study (NIS) data may be either unmatched, or matched to administrative datasets, including the Police National Computer (PNC), the National Pupil Database (NPD), and the Work and Pensions Longitudinal Study (WPLS), see **Table \ref{tab:matched}**.
+
+```{r, echo=FALSE, include=FALSE}
+cjrmd::default_chunk_opts()
+
+if (!require("pacman")) install.packages("pacman")
+
+pkgs <- c(
+    "tidyverse",
+    "cjrmd",
+    "kableExtra",
+    "tidyverse",
+    "scales"
+)
+
+pacman::p_load(pkgs, character.only = T)
+```
+
+```{r nis}
+row_names <- c(
+    "National Impact Study (matched and unmatched)",
+    "National Impact Study (matched only)",
+    "Family Progress Data"
+)
+col_names <- c("No. of individuals", "No. of families")
+no_ind <- c(253230, 187097, 230858)
+no_fam <- c(63671, 61664, 58566)
+
+nis_tab <- tibble(row_names, no_ind, no_fam) %>%
+    mutate_if(is.numeric, comma) %>%
+    column_to_rownames(var = "row_names")
+
+cjrmd::make_latex_table(nis_tab,
+    col_names = col_names,
+    cap = "Overview of the data used in the National Evaluation of the Troubled Families Programme report."
+) %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+```{r matched}
+row_names <- c(
+    "National Pupil Database (NPD)",
+    "Work and Pensions Longitudinal Study (WPLS)",
+    "Police National Computer (PNC)"
+)
+col_names <- c("No. of individuals", "\\% of individuals matched")
+no_ind <- c(92759, 74635, 29824)
+perc <- c(84.3, 76.1, 18.6)
+
+match_tab <- tibble(row_names, no_ind, perc) %>%
+    mutate_if(is.numeric, comma) %>%
+    column_to_rownames(var = "row_names")
+
+cjrmd::make_latex_table(match_tab,
+    col_names = col_names,
+    cap = "Overview of the linked data combined with the Troubled Families Programme data."
+) %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+# Assessment of the Data
+
+This report will first identify particular data anonymisation issues through reference to the Anonymisation Decision-making Framework (ADF) [@elliot2016]. As the data is still under full confidentiality, this report assesses only the structure of the data as outlined in the _National Evaluation of the Troubled Families Programme 2015-2020_ Report [@departmentforcommunitiesandlocalgovernment2017a]. Particularly, this report considers the first key components from the ADF:
+
+1. Describe your data situation
+2. Understand your legal responsibilities
+3. Know your data
+4. Understand the use case
+5. Meet your ethical obligations
+
+## Data Situation
+
+**Figure \ref{fig:dataflow}** gives an overview of the data flow as proposed by the research initiative. At present, the data is only accessed in house. Family and individual level demographic data is provided by local authorities, and matched to administrative datasets held by Government departments, including Police National Computer (PNC), held by the Ministry of Justice, The National Pupil Database (NPD) held by the Department for Education and the Work and Pensions Longitudinal Study (WPLS), held by the Department for Work and Pensions. In this case, these institutions are considered to be the data controllers, see **Figure \ref{fig:dataflow}**. The programme data at present is provided in house to the researchers within the _Ministry of Housing, Communities & Local Government_, it is proposed to be made available to researchers to carry out deeper analysis on the programmes effectiveness. The data is at present entirely constrained within government organisations, and is constructed by the processor using no open access data.
+
+## Legal Responsibilities
+
+The data is required to comply with the General Data Protection Regulations (GDPR) [@europeanunion2016], including the focus on personal data, defined as: 
+
+> *"an identified natural person is one who can be identified, directly or indirectly."*
+>
+> --- **GDPR 2016/679 Article 4(1)**
+
+and anonymous data:
+
+> _"anonymous information, namely information which does not relate to an identified or identifiable natural person"_
+>
+> --- **Recital 26**.
+
+Particularly there are key revisions to personal data laws brought forward through the GDPR:
+
+1. Revised Definition of personal data, including indirect and direct identification
+2. Consideration of pseudonymisation
+
+Of particular interest is the concept of pseudonymisation by which data which may appear anonymised may still be identifiable as personal data:
+
+> _"Personal data which have undergone pseudonymisation, which could be attributed to a natural person by the use of additional information should be considered to be information on on identifiable natural person"_
+>
+> --- **Recital 26**
+
+The data in question does not contain directly identifiable information such as names or addresses, but considering the large amount of indirect personal information provided, it is possible that the data itself is pseudonymised.
+
+```{r, dataflow, fig.cap='Proposed data flow indicating the extension with red dotted line.', out.width="\\linewidth"}
+knitr::include_graphics("./figs/data_flow.pdf")
+```
+
+## Understanding the Data
+
+In order to ensure the data provided gives both a suitable level of depth for the purpose it is intended, and exclude unnecessary information which may be used for reversing anonymisation, this section explores how the data may be manipulated to conform with the legal and ethical responsibilities in relation to personal data.
+
+Given this data contains the data linkage of a variety of indirect personal information from different closed sources, there is a particular concern that reversing the anonymisation of this data would be trivial [@harron2015]. The purpose of this data release is purely to allow researchers to perform more in depth analysis on the effectiveness of the Troubled Families Programme. As such, it is likely that the data may be simplified, to ensure there is less risk to anonymisation.
+
+This report considers the first two aspects of the four stages of ensuring anonymity described in @elliot2016, both of which do not require access to the data:
+
+* Data Minimisation from the data situation audit
+
+* Scenario Analysis
+
+* ~~Data Analytical Approaches~~
+
+* ~~Intruder/Penetration testing~~
+
+
+### Data Minimisation
+
+The full dataset in question concerns over 60,000 families, across the United Kingdom. It is likely that a smaller sample of the data would still provide the same level of analytical detail. However, as the data provides a very small subset of the total population, it is unlikely that any personal information could be directly inferred due to the sampling size.
+
+It is unlikely that all variables need to be kept, major identifying variables such as the age of parents and children may be considered for removal. Any unnecessary demographic information, if included, such as religious views, country of birth should also be removed. Additionally, school level information may not be entirely necessary, for example, the specific school children are attending may not be necessary for the analysis. Table \ref{tab:vars} gives an overview of some select variables, it should be noted that while some variables may be considered medium or low risk of not conforming with anonymity, when taken together they may be considered a higher risk. For example, if a person is identifiable, their work status may be considered high risk personal information, and when taken together, religion, work status, and location may give identifiable information for persons in unique circumstances.
+
+```{r vars}
+col_names <- c("Variable", "Type of Variable", "Risk", "Importance")
+variables <- c(
+    "Name", "Age",
+    "Religion", "School Attended",
+    "Location", "Police History", "Work Status"
+)
+types <- c("Direct", rep("Indirect", 6))
+risk <- c("High", "High", "Medium", "Medium", "High", "High", "Low")
+importance <- c("Low", "Medium", "Low", "Low", "Medium", "Medium", "Medium")
+
+vars_tab <- tibble(variables, types, risk, importance)
+
+cjrmd::make_latex_table(vars_tab,
+    col_names = col_names,
+    cap = "Overview of variables expected to be found in this data. Type of variable indicates whether it is considered to be directly identifiable, risk indicates the risk of the variable not conforming with ethical or legal anonymisation, and importance indicates the level of importance in relation to the goal of the data release."
+) %>%
+    kable_styling(latex_options = "HOLD_position")
+```
+
+The most straightforward method for ensuring anonymisation would be to aggregate the data. Aggregation may be to either family level (rather than individual), or to a standardised geographic area, for example, to census tracts. In this sense, anonymisation is achieved through generalisation, as described in $k$-anonymisation [@sweeney2002]. Additional methods may consider the banding of age groups rather than complete removal. For example using 20 - 30, instead of a specific age. Given are examples of three levels of aggregation:
+
+(1) 40 year old male, history of domestic violence, lives in L5, Liverpool, never worked, married to 40 year old wife, with 3 children aged 7, 15, 17, attending local school.
+
+(2) Family of 5, three children, domestic violence, Liverpool, no income.
+
+(3) Liverpool L5: Average number of children = 3, Proportion of families with domestic violence = 30%. 20% Unemployed.
+
+Based on the original data concerned in this programme, (1) gives an example of the sort of individual level information that may be derived. While (1) contains no direct personal information, @elliot2018 note that a person attempting to reverse anonymisation may have access to an unpredictable amount of additional information. For example, the 40 year old male may have a social media accounts containing all the personal information not included here, which may be obtained through searches based on this published data. Through this therefore, a person may discover a known, identifiable person, and determine that they have a history of domestic violence. 
+
+Similarly with (2), as outlined in the GDPR, it is likely that pseudonymisation may be a particular concern in some instances of this data. For families in unique circumstances, e.g. with a large number of children of specific ages in a particular area, it may be trivial to reverse the anonymisation. This relates to the GDPR _means reasonably likely to be used_ test, given the time, cost, and technical capabilities of such an exercise would be low both when the data is combined processor stage, and when publicised for researchers.
+
+It should be noted that if any directly identifiable features are present in the data, these should be excluded through complete suppression. Irrelevant information such as religion may also be excluded through this method [@sweeney2002].
+
+
+## Scenario Analysis
+
+This data contains closed information regarding past criminal offences of many individuals involved, as such reverse anonymisation may be attempted in order to de-anonymise this sensitive information. In terms of the resources required for this, at its current state the data provides a large amount of information that would simply need to be linked with online social networks to provide personal information. As this data is proposed to be open access for research it would not be a problem for anyone to carry out such an attack. It is worth considering that data at an individual level is rarely open access, and demographic information such as the census are required to always be aggregated when publicised.
+
+## Introducing Controls
+
+```{r, extflow, fig.cap='Proposed extension to the researcher accessed data'}
+knitr::include_graphics("./figs/ext_flow.pdf")
+```
+
+Finally, another solution to ensuring anonymisation is to restrict open access in some way. Restricting access follows environmental controls put forward by @duncan2011 by restricting 'who' may access the data. @elliot2016 note that this is essentially about agent control, and by restricting access to 10 people, rather than allowing 10,000 to openly access the data, the risk level is decreased. Consideration must be made as to whom may access the data therefore if given restricted access. In this case, it seems likely that access may be designated to trusted research institutions, those of which have a history of ethical use of restricted data.
+
+This particularly relates to the overall goal of this data release, in that the goal is purely to provide improved analysis of the effectiveness of the Troubled Families Programme. Governance control in this regard may restrict the analysis permitted, and in particular would ensure that when publishing any results of analysis, the data involved is not indirectly accessible for anyone who was not permitted access in the first place [@elliot2016].
+
+In order to select a balance between full, open access to the data, and a high quality dataset for in-depth analysis, the data may be distributed using a combination of the control measures and data minimisation discussed. **Figure \ref{fig:extflow}** demonstrates an approach to solving the issues by providing aggregated open access data for research, while also permitting certain institutions full unaggregated access, ensuring that some high quality data is made available.
+
+# Conclusion and Recommendations
+
+The data in question is comprised of a number of closed access data sources, each of which contain large amounts of high risk personal data in their raw form. Even with the exclusion of any direct personal data, the aggregation of these datasets have the potential to provide indirect methods for reversing anonymisation through relatively simple means, either solely or with the assistance outside, uncontrolled data sources.
+
+The recommendation of this report is to ensure that the data primarily is stripped back to its core variables of interest in the ultimate goal of assessing the effectiveness of the troubled families programme. This includes the removal of any high risk variable, e.g. exact ages, unnecessary police report information, schooling information, or work history. Additionally, the data should not be made available at an individual level for anyone, instead aggregated to a family level, as should be expected for an assessment of a family targeted programme. This data should not be made available openly, instead contained closed to select institutions through a lab. While open access to the other data may be provided through an aggregation to LSOA census units.
+
+# References
+\small

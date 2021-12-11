@@ -1,0 +1,838 @@
+\documentclass[10pt,]{article}
+\usepackage[margin=1in]{geometry}
+\newcommand*{\authorfont}{\fontfamily{phv}\selectfont}
+
+\usepackage{xcolor}
+\definecolor{ttcolor}{RGB}{255,40,40}
+
+\newenvironment{cslreferences}%
+  {}%
+  {\par}
+
+% redefinition of \texttt
+\let\Oldtexttt\texttt
+\renewcommand\texttt[1]{{\ttfamily\color{ttcolor}#1}}
+
+\usepackage{caption}
+\captionsetup{font={stretch=1.2,small},
+              labelfont=bf,
+              textfont=it,
+              margin=0.5cm,
+              width=.90\textwidth}
+% captions
+% Figure names
+\renewcommand{\figurename}{Fig.}
+
+\usepackage{tikz}
+\usetikzlibrary{trees}
+
+\usepackage{abstract}
+\renewcommand{\abstractname}{}    % clear the title
+\renewcommand{\absnamepos}{empty} % originally center
+\newcommand{\blankline}{\quad\pagebreak[2]}
+
+\usepackage{amsmath}
+\usepackage{algorithm}
+\usepackage[noend]{algpseudocode}
+
+\makeatletter
+\def\BState{\State\hskip-\ALG@thistlm}
+\makeatother
+
+\usepackage{mathspec}
+
+\usepackage{fontspec}
+\setmonofont[Scale=MatchLowercase]{JetBrains Mono Regular}
+\setallmainfonts(Digits,Latin){XCharter}
+\setmainfont{XCharter}
+
+\providecommand{\tightlist}{%
+  \setlength{\itemsep}{0pt}\setlength{\parskip}{0pt}} 
+\usepackage{longtable,booktabs}
+
+\usepackage{titlesec}
+\titlespacing\section{0pt}{12pt plus 4pt minus 2pt}{6pt plus 2pt minus 2pt}
+\titlespacing\subsection{0pt}{12pt plus 4pt minus 2pt}{6pt plus 2pt minus 2pt}
+\titleformat*{\subsection}{\bfseries\itshape}
+\titleformat{\section}{\normalfont\fontsize{12}{15}\bfseries}{\thesection}{1em}{}
+
+\usepackage{titling}
+\setlength{\droptitle}{-.25cm}
+
+% better paragraph indents
+\edef\restoreparindent{\parindent=\the\parindent\relax}
+\usepackage{parskip}
+\restoreparindent
+
+\linespread{1.05}
+
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\usepackage{lastpage}
+\renewcommand{\headrulewidth}{0.3pt}
+\renewcommand{\footrulewidth}{0.0pt} 
+\lhead{\footnotesize \textbf{201374125}}
+\chead{}
+\rhead{\footnotesize \emph{Building a Graph Database of Place
+Descriptions}}
+%\lfoot{}
+%\cfoot{\small \thepage/\pageref*{LastPage}}
+%\rfoot{}
+
+\fancypagestyle{firststyle}
+{
+\renewcommand{\headrulewidth}{0pt}%
+   \fancyhf{}
+   \fancyfoot[C]{\small \thepage/\pageref*{LastPage}}
+}
+
+%\def\labelitemi{--}
+%\usepackage{enumitem}
+%\setitemize[0]{leftmargin=25pt}
+%\setenumerate[0]{leftmargin=25pt}
+
+
+\usepackage{titlesec}
+
+
+\makeatletter
+\@ifpackageloaded{hyperref}{}{%
+\ifxetex
+  \usepackage[setpagesize=false, % page size defined by xetex
+              unicode=false, % unicode breaks when used with xetex
+              xetex]{hyperref}
+\else
+  \usepackage[unicode=true]{hyperref}
+\fi
+}
+\@ifpackageloaded{color}{
+    \PassOptionsToPackage{usenames,dvipsnames}{color}
+}{%
+    \usepackage[usenames,dvipsnames]{color}
+}
+\makeatother
+\hypersetup{breaklinks=true,
+            bookmarks=true,
+            pdfauthor={ ()},
+             pdfkeywords = {},  
+            pdftitle={Building a Graph Database of Place Descriptions},
+            colorlinks=true,
+            citecolor=blue,
+            urlcolor=blue,
+            linkcolor=magenta,
+            pdfborder={0 0 0}}
+\urlstyle{same}  % don't use monospace font for urls
+
+
+\setcounter{secnumdepth}{0}
+
+\usepackage{color}
+\usepackage{fancyvrb}
+\newcommand{\VerbBar}{|}
+\newcommand{\VERB}{\Verb[commandchars=\\\{\}]}
+\DefineVerbatimEnvironment{Highlighting}{Verbatim}{commandchars=\\\{\}}
+% Add ',fontsize=\small' for more characters per line
+\usepackage{framed}
+\definecolor{shadecolor}{RGB}{248,248,248}
+\newenvironment{Shaded}{\begin{snugshade}}{\end{snugshade}}
+\newcommand{\AlertTok}[1]{\textcolor[rgb]{0.94,0.16,0.16}{#1}}
+\newcommand{\AnnotationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\AttributeTok}[1]{\textcolor[rgb]{0.77,0.63,0.00}{#1}}
+\newcommand{\BaseNTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\BuiltInTok}[1]{#1}
+\newcommand{\CharTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\CommentTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\CommentVarTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ConstantTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ControlFlowTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\DataTypeTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{#1}}
+\newcommand{\DecValTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\DocumentationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\ErrorTok}[1]{\textcolor[rgb]{0.64,0.00,0.00}{\textbf{#1}}}
+\newcommand{\ExtensionTok}[1]{#1}
+\newcommand{\FloatTok}[1]{\textcolor[rgb]{0.00,0.00,0.81}{#1}}
+\newcommand{\FunctionTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\ImportTok}[1]{#1}
+\newcommand{\InformationTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+\newcommand{\KeywordTok}[1]{\textcolor[rgb]{0.13,0.29,0.53}{\textbf{#1}}}
+\newcommand{\NormalTok}[1]{#1}
+\newcommand{\OperatorTok}[1]{\textcolor[rgb]{0.81,0.36,0.00}{\textbf{#1}}}
+\newcommand{\OtherTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{#1}}
+\newcommand{\PreprocessorTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textit{#1}}}
+\newcommand{\RegionMarkerTok}[1]{#1}
+\newcommand{\SpecialCharTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\SpecialStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\StringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\VariableTok}[1]{\textcolor[rgb]{0.00,0.00,0.00}{#1}}
+\newcommand{\VerbatimStringTok}[1]{\textcolor[rgb]{0.31,0.60,0.02}{#1}}
+\newcommand{\WarningTok}[1]{\textcolor[rgb]{0.56,0.35,0.01}{\textbf{\textit{#1}}}}
+
+
+
+
+\usepackage{setspace}
+
+\title{Building a Graph Database of Place Descriptions}
+\author{201374125}
+\date{}
+
+
+\def\citeapos#1{\citeauthor{#1}'s (\citeyear{#1})}
+
+% header includes!
+\linespread{1.05}
+
+
+\begin{document}  
+
+
+
+\thispagestyle{plain} 
+
+\begin{flushleft}\Large \bf Building a Graph Database of Place
+Descriptions  \end{flushleft}
+	\vspace{1 mm}   
+201374125 \\
+\emph{} \\
+    \\
+
+% \blankline 
+  
+
+\hrule
+
+\vspace{6 mm}
+	
+
+
+\hypertarget{introduction}{%
+\section{Introduction}\label{introduction}}
+
+This project aims to provide a structured graph database of location
+descriptions for use in geographic natural language processing tasks.
+Using a graph database for the store of this information allows for
+semantic associations between locations to be inferred based on their
+proximity within the database. This provides an alternative to the
+purely coordinate based and euclidean associations between geographic
+locations, and attempts to capture platial connections, as opposed to
+purely spatial ones. This considers previous work addressing the
+development of hierarchical geo-ontologies (Sun \emph{et al.},
+\protect\hyperlink{ref-sun2019a}{2019}), and attempts to describe the
+hierarchical nature of definable geographic concepts in a computer
+interpretable way, demonstrated on \textbf{Fig. \ref{f:hier}}.
+
+\begin{figure}[H]
+\begin{center}
+\begin{tikzpicture}[level distance=1.5cm,
+  level 1/.style={sibling distance=3cm},
+  level 2/.style={sibling distance=1.5cm}]
+  \node {Country}
+    child {node {Region}}
+    child {node {Region}
+        child {node {County}}
+        child {node {County}
+          child {node {District}}
+          child {node {District}
+              child {node {Postcode}
+                child {node {Location}}}
+      }}
+    };
+\end{tikzpicture}
+\end{center}
+\caption{The hierarchical representation of geographical concepts}\label{f:hier}
+\end{figure}
+
+Purely geographic implementations of similar work already exist, for
+example \href{https://geonames.org}{Geonames}, and
+\href{https://openstreetmap.org}{OpenStreetMap}, which both have
+comprehensive coverage of places for much of the UK. However, these do
+not provide any descriptive language associated with the geographic
+locations. \href{http://dbpedia.org}{DBpedia} is an example of a more
+general knowledge base, and given it is built from data extracted from
+Wikipedia, it provides descriptions for many of the items contained
+within it.
+
+Labelled data is often a primary concern when performing many analytical
+tasks, and is considered a particular issue in geographic natural
+language processing (Gritta, \protect\hyperlink{ref-gritta2019}{2019};
+Stock \emph{et al.}, \protect\hyperlink{ref-stock2013}{2013}). Much of
+the existing work has relied on time consuming, manual labelling of data
+which leads to smaller datasets (Middleton \& Krivcovs,
+\protect\hyperlink{ref-middleton2016}{2016}; Wallgrün \emph{et al.},
+\protect\hyperlink{ref-wallgrun2018}{2018}; Gey \emph{et al.},
+\protect\hyperlink{ref-gey2006}{2006}), and many which are not made
+freely available (Leidner \& Lieberman,
+\protect\hyperlink{ref-leidner2011}{2011}; Leidner,
+\protect\hyperlink{ref-leidner2007}{2007}; Andogah,
+\protect\hyperlink{ref-andogah2010}{2010}; Weissenbacher \emph{et al.},
+\protect\hyperlink{ref-weissenbacher2019}{2019}). The lack of large,
+high quality, labelled geographic natural language data is well noted by
+many authors in this subject area (Tobin \emph{et al.},
+\protect\hyperlink{ref-tobin2010}{2010}; Speriosu,
+\protect\hyperlink{ref-speriosu2013}{2013}; Weissenbacher \emph{et al.},
+\protect\hyperlink{ref-weissenbacher2015}{2015},
+\protect\hyperlink{ref-weissenbacher2019}{2019}; Gritta \emph{et al.},
+\protect\hyperlink{ref-gritta2018}{2018}; Karimzadeh \emph{et al.},
+\protect\hyperlink{ref-karimzadeh2019}{2019}).
+
+The production of a dataset containing descriptive information, in
+addition to hierarchical geo-information regarding locations may assist
+with a variety of geographic natural language tasks. For example, in
+toponym disambiguation, contextual information provided alongside the
+identified toponym is often used as a method for correctly resolving to
+a single toponym (Tobin \emph{et al.},
+\protect\hyperlink{ref-tobin2010}{2010}; Roberts,
+\protect\hyperlink{ref-roberts2010}{2010}; Speriosu,
+\protect\hyperlink{ref-speriosu2013}{2013}), this may include topics
+associated with particular toponyms (Speriosu,
+\protect\hyperlink{ref-speriosu2013}{2013}; Adams \& McKenzie,
+\protect\hyperlink{ref-adams2013}{2013}; Ju \emph{et al.},
+\protect\hyperlink{ref-ju2016}{2016}), and metadata associated with the
+toponyms, including geotags (Zhang \& Gelernter,
+\protect\hyperlink{ref-zhang2014}{2014}), and other structured
+information (Weissenbacher \emph{et al.},
+\protect\hyperlink{ref-weissenbacher2015}{2015}). Additionally, this
+dataset acts as labelled descriptive information regarding a specific,
+known (geocoded) location, useful for recent developments in
+fine-grained localisation research (Al-Olimat \emph{et al.},
+\protect\hyperlink{ref-al-olimat2019}{2019}; Chen \emph{et al.},
+\protect\hyperlink{ref-chen2018a}{2018}\protect\hyperlink{ref-chen2018a}{a},
+\protect\hyperlink{ref-chen2018}{2018}\protect\hyperlink{ref-chen2018}{b}),
+and point of interest identification (Moncla \emph{et al.},
+\protect\hyperlink{ref-moncla2014}{2014}; Li \& Sun,
+\protect\hyperlink{ref-li2014}{2014}).
+
+This project therefore aims to bring forward the most complete corpus of
+labelled geographic natural language available through automatic
+extraction of Wikipedia place summaries, providing both contextual
+information associated with toponyms and hierarchical geo-information.
+
+\hypertarget{methodology}{%
+\section{Methodology}\label{methodology}}
+
+\hypertarget{dbpedia}{%
+\subsection{DBpedia}\label{dbpedia}}
+
+\href{https://wiki.dbpedia.org/}{DBpedia} is a crowd sourced collection
+of information extracted from
+\href{https://commons.wikimedia.org/wiki/Main_Page}{Wikimedia} projects,
+presented in a structured format resembling an open knowledge graph
+(OKG). This provides linked data in a machine-readable format,
+accessible through a \href{http://www.dbpedia.org/sparql}{SPARQL
+querying API}. The data follows the
+\href{https://www.w3.org/RDF/}{Resource Description Framework} (RDF) as
+defined by the World Wide Web Consortium (W3C) specifications, providing
+an alternative web linking structure. RDF models for data exchange use
+URIs to name a relationship between things, as well as information
+regarding the two ends of each link, generally known as a triple.
+
+As of this report, the DBpedia knowledge base describes 4.58 million
+things, including persons, places, creative works, and organisations.
+The data is available under the
+\href{https://creativecommons.org/licenses/by-sa/3.0/}{Creative Commons
+Attribution-ShareAlike 3.0 Licence} and the
+\href{https://www.gnu.org/licenses/fdl-1.3.en.html}{GNU Free
+Documentation Licence} which allows for copying, redistribution and
+adaptation of the data, including for commercial use.
+
+\hypertarget{building-a-sparql-query}{%
+\subsection{Building a SPARQL Query}\label{building-a-sparql-query}}
+
+SPARQL is an RDF query language which allows for the use of namespace
+prefixes to query URI triples from the DBpedia RDF database. These
+prefixes include DBpedia defined
+\href{http://dbpedia.org/ontology/}{ontologies},
+\href{http://dbpedia.org/resource/}{resources}, or
+\href{http://dbpedia.org/property/}{properties}, and additional
+prefixes, including those defined by the W3C. The DBpedia prefixes are
+perhaps the most useful, as they provide consistent class definitions
+for types of thing contained in the database. For example anything given
+the class \texttt{Place} is likely of interest for this research. This
+class \texttt{Place} then provides various subclasses which may be used
+to perform specific queries, \texttt{Architectural\ Structure} and
+Celestial \texttt{Body} are examples of \texttt{Place} subclasses. These
+subclasses also provide their own subclasses, e.g.~\texttt{Building},
+\texttt{Pyramid.}
+
+However, from inspection of specific URIs for places within the United
+Kingdom, it appears that these RDF links are often incomplete, or
+provide mismatched information. It is rare for a place that is not
+classified as a \texttt{Building} to have \texttt{Building} level class
+granularity, and many places in the UK only contain the \texttt{Place}
+class. Additionally, the \texttt{Country} relation for many places
+returns primarily the \emph{United Kingdom}, but includes counties
+e.g.~\emph{Dorset}, and occasionally returns \emph{England}, but never
+\emph{Scotland} or \emph{Wales}. The same is true with
+\texttt{District}, which occasionally returns cities
+e.g.~\emph{Burthwaite} returns \emph{City of Carlisle}. Some naming is
+inconsistent e.g.~\emph{Lewes (district)} vs \emph{Scarborough
+(borough)} and \emph{South Lakeland} are all labels given to
+\texttt{Place} in the United Kingdom, chiefly when place names are not
+unique they contain additional information in parentheses. Therefore, it
+is unlikely that comprehensive coverage may be achieved if attempting to
+query places using their more granular classes. It is also important for
+the inclusion of all places that, instead of just querying using the
+\emph{United Kingdom}, the query includes the constituent countries.
+Coordinate information is also present for many, but not all, DBpedia
+places.
+
+Considering the limitations of the database in relation to the United
+Kingdom, a query was built to obtain English Wikipedia abstracts for
+each \texttt{Place} in any country within Great Britain, using the
+\href{http://dbpedia.org/sparql}{DBpedia SPARQL endpoint}. Given the
+above constraints, no further information was extracted. This query is
+given below:
+
+\vspace{2mm}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\NormalTok{    PREFIX dbo: }\OperatorTok{\textless{}}\NormalTok{http:}\OperatorTok{//}\NormalTok{dbpedia.org}\OperatorTok{/}\NormalTok{ontology}\OperatorTok{/\textgreater{}}
+\NormalTok{    PREFIX res: }\OperatorTok{\textless{}}\NormalTok{http:}\OperatorTok{//}\NormalTok{dbpedia.org}\OperatorTok{/}\KeywordTok{resource}\OperatorTok{/\textgreater{}}
+\NormalTok{    PREFIX rdf: }\OperatorTok{\textless{}}\NormalTok{http:}\OperatorTok{//}\NormalTok{www.w3.org}\OperatorTok{/}\DecValTok{1999}\OperatorTok{/}\DecValTok{02}\OperatorTok{/}\DecValTok{22}\OperatorTok{{-}}\NormalTok{rdf}\OperatorTok{{-}}\NormalTok{syntax}\OperatorTok{{-}}\NormalTok{ns\#}\OperatorTok{\textgreater{}}
+\NormalTok{    PREFIX rdfs: }\OperatorTok{\textless{}}\NormalTok{http:}\OperatorTok{//}\NormalTok{www.w3.org}\OperatorTok{/}\DecValTok{2000}\OperatorTok{/}\DecValTok{01}\OperatorTok{/}\NormalTok{rdf}\OperatorTok{{-}}\NormalTok{schema\#}\OperatorTok{\textgreater{}}
+
+    \KeywordTok{SELECT} \KeywordTok{DISTINCT}\NormalTok{ ?lab ?}\FunctionTok{abs}
+    \KeywordTok{WHERE}\NormalTok{ \{}
+\NormalTok{            \{ ?uri dbo}\CharTok{:country}\NormalTok{ res}\CharTok{:England}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:country}\NormalTok{ res}\CharTok{:United\_Kingdom}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:country}\NormalTok{ res}\CharTok{:Scotland}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:country}\NormalTok{ res}\CharTok{:Wales}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:location}\NormalTok{ res}\CharTok{:England}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:location}\NormalTok{ res}\CharTok{:United\_Kingdom}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:location}\NormalTok{ res}\CharTok{:Scotland}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri dbo}\CharTok{:location}\NormalTok{ res}\CharTok{:Wales}\NormalTok{ \} .}
+
+\NormalTok{            \{ ?uri rdf}\CharTok{:type}\NormalTok{ dbo}\CharTok{:Place}\NormalTok{ \} }\KeywordTok{UNION}
+\NormalTok{            \{ ?uri rdf}\CharTok{:type}\NormalTok{ dbo}\CharTok{:Organisation}\NormalTok{ \} .}
+
+\NormalTok{              ?uri rdfs}\CharTok{:lab}\NormalTok{ ?lab . }\KeywordTok{FILTER}\NormalTok{ (lang(?lab) }\OperatorTok{=} \StringTok{\textquotesingle{}en\textquotesingle{}}\NormalTok{)}
+\NormalTok{              ?uri dbo}\CharTok{:abstract}\NormalTok{ ?}\FunctionTok{abs}\NormalTok{ . }\KeywordTok{FILTER}\NormalTok{ (lang(?}\FunctionTok{abs}\NormalTok{) }\OperatorTok{=} \StringTok{\textquotesingle{}en\textquotesingle{}}\NormalTok{)}
+\NormalTok{    \} }\KeywordTok{LIMIT} \DecValTok{10000}
+\end{Highlighting}
+\end{Shaded}
+
+To overcome the 10,000 query limit, the query was looped over several
+times with a 10,000 query offset to obtain a full set of results.
+
+\hypertarget{including-metadata}{%
+\subsection{Including Metadata}\label{including-metadata}}
+
+To obtain the further geographic information required for building the
+hierarchical links between the extracted locations, the
+\href{https://data.ordnancesurvey.co.uk/datasets/os-linked-data}{Ordnance
+Survey Linked Data} was considered as it was accessible through a SPARQL
+endpoint. However, the data itself did not contain the hierarchical
+links required, and given such a large amount of data was being
+extracted, it was not an efficient way to gather the data.
+Alternatively, Ordnance Survey provides access to two core datasets
+through the Edina Digimap service under the
+\href{https://digimap.edina.ac.uk/webhelp/os/copyright/digimap_os_eula.pdf}{Educational
+User Licence}, allowing for free unlimited access of the data for
+\emph{Educational Use}. However, as this project is undertaken in
+collaboration with Ordnance Survey, it is likely that the licence will
+be more flexible.
+
+The two datasets accessed through Digimap were Ordnance Survey Points of
+Interest (POI), and OS Open Names. The POI data contains various
+information regarding certain locations in the United Kingdom classified
+as POI. A POI is generally defined as a location that a person may find
+useful or interesting. In the case of this data, POI include locations
+such as \emph{All Saints Church Hall}, the word \emph{Church}, or the
+names of shops e.g.~\emph{The Co-operative}. While much of this data
+does not provide useful locational information for this project, for any
+unique named location it may provide additional meta information. The
+POI dataset was linked with the names of DBpedia locations and provided
+the additional metadata for the feature geometries \texttt{X},
+\texttt{Y}, \texttt{admin\_boundary}, \texttt{geographic\_county}, and
+\texttt{postcode}.
+
+The OS Open Names dataset provided additional information for the
+majority of DBpedia locations, linking was made particularly easy given
+the presence of a variable in this dataset called
+\texttt{SAME\_AS\_DBPEDIA} which enabled accurate linking with the
+DBpedia dataset for the majority of locations. Additional locations were
+linked by name as with the POI information. The OS Open Names data
+provides the additional metadata \texttt{TYPE}; including
+\emph{hydrography}, \emph{populatedPlace}, \emph{transportNetwork}, etc.
+With a more granular \texttt{LOCAL\_TYPE.} Additionally
+\texttt{feature\_easting} and \texttt{feature\_northing} geometries,
+\texttt{POSTCODE}, \texttt{BOROUGH}, \texttt{COUNTY} and
+\texttt{COUNTRY}, provided the in depth hierarchical structure as
+outlined in \textbf{Figure \ref{f:hier}}.
+
+\hypertarget{building-the-database}{%
+\subsection{Building the Database}\label{building-the-database}}
+
+Neo4j is the most popular graph database management system and has been
+used in previous work relating to the construction of databases for use
+in geographic natural language processing to semantically link
+associations between places (Chen \emph{et al.},
+\protect\hyperlink{ref-chen2018}{2018}\protect\hyperlink{ref-chen2018}{b},
+\protect\hyperlink{ref-chen2018a}{2018}\protect\hyperlink{ref-chen2018a}{a};
+Kim \emph{et al.}, \protect\hyperlink{ref-kim2017}{2017}).
+
+First constraints were created to ensure no duplicates are created, and
+to improve the efficiency of the database construction.
+
+\vspace{2mm}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{CREATE} \KeywordTok{CONSTRAINT} \KeywordTok{ON}\NormalTok{ (pc}\CharTok{:Postcode}\NormalTok{) ASSERT pc.name }\KeywordTok{IS} \KeywordTok{UNIQUE}\NormalTok{;}
+\KeywordTok{CREATE} \KeywordTok{CONSTRAINT} \KeywordTok{ON}\NormalTok{ (b}\CharTok{:Borough}\NormalTok{) ASSERT b.name }\KeywordTok{IS} \KeywordTok{UNIQUE}\NormalTok{;}
+\KeywordTok{CREATE} \KeywordTok{CONSTRAINT} \KeywordTok{ON}\NormalTok{ (c}\CharTok{:County}\NormalTok{) ASSERT c.name }\KeywordTok{IS} \KeywordTok{UNIQUE}\NormalTok{;}
+\KeywordTok{CREATE} \KeywordTok{CONSTRAINT} \KeywordTok{ON}\NormalTok{ (cy}\CharTok{:Country}\NormalTok{) ASSERT cy.name }\KeywordTok{IS} \KeywordTok{UNIQUE}\NormalTok{;}
+\end{Highlighting}
+\end{Shaded}
+
+Following this, the complete data including DBpedia descriptions, and OS
+metadata was read in periodically 10,000 rows at a time to ensure memory
+constraints were followed. This code snippet shows the creation of the
+\emph{Location} node, which includes the \texttt{name}, \texttt{type},
+\texttt{X}, \texttt{Y}, and \texttt{abstract} variables. This was
+repeated for each of the hierarchical locations contained within the
+data.
+
+\vspace{2mm}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{USING}\NormalTok{ PERIODIC }\KeywordTok{COMMIT} \DecValTok{10000}
+\NormalTok{LOAD CSV }\KeywordTok{WITH}\NormalTok{ HEADERS }\KeywordTok{FROM} \OtherTok{"file:///wiki.csv"} \KeywordTok{AS} \KeywordTok{row}
+\KeywordTok{WITH} \KeywordTok{row} \KeywordTok{WHERE} \KeywordTok{NOT} \KeywordTok{row}\NormalTok{.}\KeywordTok{label} \KeywordTok{IS} \KeywordTok{null}
+\KeywordTok{MERGE}\NormalTok{ (l}\CharTok{:Location}\NormalTok{ \{name: }\KeywordTok{row}\NormalTok{.}\KeywordTok{label}\NormalTok{,}
+                   \KeywordTok{type}\NormalTok{: }\KeywordTok{row}\NormalTok{.}\KeywordTok{TYPE}\NormalTok{,}
+\NormalTok{                   X: }\KeywordTok{row}\NormalTok{.GEOMETRY\_X,}
+\NormalTok{                   Y: }\KeywordTok{row}\NormalTok{.GEOMETRY\_Y,}
+\NormalTok{                   abstract: }\KeywordTok{row}\NormalTok{.}\FunctionTok{abs}\NormalTok{\})}
+\KeywordTok{RETURN} \FunctionTok{count}\NormalTok{(l);}
+
+\OperatorTok{..}
+\end{Highlighting}
+\end{Shaded}
+
+Creation of the relations between locations and their hierarchical
+relations is given below, in this case postcodes containing locations:
+
+\vspace{2mm}
+
+\begin{Shaded}
+\begin{Highlighting}[]
+\KeywordTok{USING}\NormalTok{ PERIODIC }\KeywordTok{COMMIT} \DecValTok{10000}
+\NormalTok{LOAD CSV }\KeywordTok{WITH}\NormalTok{ HEADERS }\KeywordTok{FROM} \OtherTok{"file:///wiki.csv"} \KeywordTok{AS} \KeywordTok{row}
+\KeywordTok{WITH} \KeywordTok{row}\NormalTok{.}\KeywordTok{label} \KeywordTok{as}\NormalTok{ lname, }\KeywordTok{row}\NormalTok{.POSTCODE\_DISTRICT }\KeywordTok{AS}\NormalTok{ pcname}
+\NormalTok{MATCH (l}\CharTok{:Location}\NormalTok{ \{name: lname\})}
+\NormalTok{MATCH (pc}\CharTok{:Postcode}\NormalTok{ \{name: pcname\})}
+\KeywordTok{MERGE}\NormalTok{ (pc)}\OperatorTok{{-}}\NormalTok{[rel}\CharTok{:CONTAINS}\NormalTok{]}\OperatorTok{{-}\textgreater{}}\NormalTok{(l)}
+\KeywordTok{RETURN} \FunctionTok{count}\NormalTok{(rel);}
+
+\OperatorTok{..}
+\end{Highlighting}
+\end{Shaded}
+
+\hypertarget{results}{%
+\section{Results}\label{results}}
+
+Of the 49,923 \emph{Place} and \emph{Organisation} labelled results
+extracted from the United Kingdom (excluding Northern Ireland), 23,020
+were linked successfully with the OS POI, and OS Open Places data.
+
+The Ordnance Survey POI data contains a total of 4,320,574 results, of
+which, 70,959 were initially joined based on the DBpedia label. Of
+these, only 6,646 provided unique abstracts, with analysis revealing
+that DBpedia places with many repeated entries in the POI inventory
+included general concepts such as \emph{Guide Post}, and company names
+like \emph{Premier Inn}. Any ambiguous entry was therefore removed to
+ensure the abstract was correctly associated with the POI. Following
+this, the POI inventory provided a total of 5,534 unambiguous results.
+OS Open Data provided 2,927,487 places, joining using the place name
+first provided 29,367 results, and following the removal of duplicates,
+this was reduced down to 13,881. It is noted that place names from
+DBpedia which include additional information e.g.~\emph{Place Name,
+(County)} are unlikely to be included through this method. Using the
+\texttt{SAME\_AS\_DBPEDIA} column enabled the linking of a further
+15,122 rows, assumed to be accurate.
+
+\hypertarget{discussion-and-further-work}{%
+\section{Discussion and Further
+Work}\label{discussion-and-further-work}}
+
+Previous studies have made use of the various classes DBpedia provides,
+for example Gao \emph{et al.} (\protect\hyperlink{ref-gao2013}{2013})
+used the \texttt{dbpedia-owl:nearestCity} relation in the \texttt{City}
+class to obtain \emph{platial buffers} for city boundaries. They also
+note the ability to perform \emph{platial joins} to obtain total
+populations of all towns in the Californian County of Santa Barbara by
+using the \texttt{partOf} predicate in relation to the \texttt{County}
+class. Such examples however rely on both the comprehensive coverage of
+classes and relations, and do not provide the granularity of relations
+this study was hoping to achieve. It should be noted that it appears
+that the United States often has more complete and consistent
+representations on Wikipedia when compared with the United Kingdom.
+Additionally, Rizzo \& Cano (\protect\hyperlink{ref-rizzo2015}{2015})
+utilised the ontologies DBpedia provides for entity classification,
+however, entity recognition work generally considers entities using
+widely used entity tags, such as those present in the
+\href{https://catalog.ldc.upenn.edu/LDC2013T19}{OntoNotes Release 5.0}.
+
+Scheider \& Purves (\protect\hyperlink{ref-scheider2013}{2013}) discuss
+the ability to combine Semantic Web reasoning with techniques associated
+with Geographic Information Retrieval to localise places based on both
+spatial and semantic relationships found in place descriptions. Namely
+the relationships found between the place and other places, objects, or
+activities. Building on this, the work presented in this report could be
+used for the construction of a semantic gazetteer, first described by
+Montello \emph{et al.} (\protect\hyperlink{ref-montello2003}{2003}),
+with the goal of providing relevant geo-information, extracted from
+descriptions, in a structured format. Early spatial cognition research
+identified the semantic associations with place, Lynch
+(\protect\hyperlink{ref-lynch1960}{1960}) for example describes the
+cognitive concepts that are apparent from sketches of a city, while
+Scheider \& Purves (\protect\hyperlink{ref-scheider2013}{2013}) note
+that these concepts are also present within verbal place descriptions,
+together with the spatial prepositions which link them.
+
+The additional information provided through a semantic gazetteer is
+considered essential for the ability to both extract and geocode spatial
+expressions in natural language and to further improve toponym
+disambiguation techniques. Chen \emph{et al.}
+(\protect\hyperlink{ref-chen2018}{2018}\protect\hyperlink{ref-chen2018}{b})
+demonstrate the use of graph databases to provide semantic links between
+spatial relations from place descriptions, where places are nodes, and
+spatial relationships are edges. Chen \emph{et al.}
+(\protect\hyperlink{ref-chen2018a}{2018}\protect\hyperlink{ref-chen2018a}{a})
+note however that by constructing place graphs in such a way, the
+triples formed do not contain the majority of the additional context.
+Particularly they note that these place graph models do not consider the
+additional semantics or related human activities which would prove
+useful for further spatial reasoning tasks.
+
+Wolter \& Yousaf (\protect\hyperlink{ref-wolter2018}{2018}) describe in
+detail the ability to derive information from place descriptions. When
+presented with a river, humans may perceive the ability for it to be
+followed, or with a hill, a person may describe going up or down,
+information which may be present in descriptive language. Spatial
+relations within descriptions rely on the reference frame of the place,
+e.g.~\emph{``in front of''} is interpreted differently for a building
+than for then end of a route, \emph{nearness} also relies on a
+understanding of the scale of the place being considered. Human
+cognitive principles also shape how place is described, however as often
+is the case, Wolter \& Yousaf (\protect\hyperlink{ref-wolter2018}{2018})
+note that place description and the place itself are likely all that is
+known. Finally, Wolter \& Yousaf
+(\protect\hyperlink{ref-wolter2018}{2018}) note that the language used
+within a description may provide an indication of the granularity being
+considered, and further entities being described will also provide
+further information regarding the place.
+
+Chen \emph{et al.}
+(\protect\hyperlink{ref-chen2018a}{2018}\protect\hyperlink{ref-chen2018a}{a})
+take the principals as described by Wolter \& Yousaf
+(\protect\hyperlink{ref-wolter2018}{2018}), and use them to further
+extend the place graph database model, taking all the information
+provided by place descriptions to form detailed nodes containing
+detailed semantic information regarding a place. Future work may mirror
+and build on these concepts, enabled through the data provided in this
+report, and build towards the construction of a semantic gazetteer.
+
+\hypertarget{references}{%
+\section{References}\label{references}}
+
+\small
+
+\hypertarget{refs}{}
+\begin{cslreferences}
+\leavevmode\hypertarget{ref-adams2013}{}%
+\textbf{Adams, B. \& McKenzie, G.} (\textbf{2013}) 'Inferring thematic
+places from spatially referenced natural language descriptions',
+\emph{Crowdsourcing geographic knowledge}. Springer, pp. 201--221.
+
+\leavevmode\hypertarget{ref-al-olimat2019}{}%
+\textbf{Al-Olimat, H.S., Shalin, V.L., Thirunarayan, K. \& Sain, J.P.}
+(\textbf{2019}) 'Towards Geocoding Spatial Expressions (Vision Paper)',
+\emph{Proceedings of the 27th ACM SIGSPATIAL International Conference on
+Advances in Geographic Information Systems - SIGSPATIAL '19}. Chicago,
+IL, USA: ACM Press, 2019, pp. 75--78.
+
+\leavevmode\hypertarget{ref-andogah2010}{}%
+\textbf{Andogah, G.} (\textbf{2010}) \emph{Geographically Constrained
+Information Retrieval}. p. 205.
+
+\leavevmode\hypertarget{ref-chen2018a}{}%
+\textbf{Chen, H., Vasardani, M., Winter, S. \& Tomko, M.}
+(\textbf{2018a}) A Graph Database Model for Knowledge Extracted from
+Place Descriptions. \emph{ISPRS International Journal of
+Geo-Information}. 7 (6). p. 221.
+
+\leavevmode\hypertarget{ref-chen2018}{}%
+\textbf{Chen, H., Winter, S. \& Vasardani, M.} (\textbf{2018b})
+Georeferencing places from collective human descriptions using place
+graphs. \emph{Journal of Spatial Information Science}. (17). pp. 31--62.
+
+\leavevmode\hypertarget{ref-gao2013}{}%
+\textbf{Gao, S., Janowicz, K., McKenzie, G. \& Li, L.} (\textbf{2013})
+\emph{Towards Platial Joins and Buffers in Place-Based GIS}. p. 8.
+
+\leavevmode\hypertarget{ref-gey2006}{}%
+\textbf{Gey, F., Larson, R., Sanderson, M., Bischoff, K., Mandl, T.,
+Womser-Hacker, C., Santos, D. \& Rocha, P.} (\textbf{2006})
+\emph{GeoCLEF 2006: The CLEF 2006 Cross-Language Geographic Information
+Retrieval Track Overview}. p. 20.
+
+\leavevmode\hypertarget{ref-gritta2019}{}%
+\textbf{Gritta, M.} (\textbf{2019}) \emph{Where are you talking about?}
+p. 159.
+
+\leavevmode\hypertarget{ref-gritta2018}{}%
+\textbf{Gritta, M., Pilehvar, M.T. \& Collier, N.} (\textbf{2018})
+'Which Melbourne? Augmenting Geocoding with Maps', \emph{Proceedings of
+the 56th Annual Meeting of the Association for Computational Linguistics
+(Volume 1: Long Papers)}. Melbourne, Australia: Association for
+Computational Linguistics, 2018, pp. 1285--1296.
+
+\leavevmode\hypertarget{ref-ju2016}{}%
+\textbf{Ju, Y., Adams, B., Janowicz, K., Hu, Y., Yan, B. \& McKenzie,
+G.} (\textbf{2016}) 'Things and strings: Improving place name
+disambiguation from short texts by combining entity co-occurrence with
+topic modeling', \emph{European Knowledge Acquisition Workshop}.
+Springer, 2016, pp. 353--367.
+
+\leavevmode\hypertarget{ref-karimzadeh2019}{}%
+\textbf{Karimzadeh, M., Pezanowski, S., MacEachren, A.M. \& Wallgrün,
+J.O.} (\textbf{2019}) GeoTxt: A scalable geoparsing system for
+unstructured text geolocation. \emph{Transactions in GIS}. 23 (1). pp.
+118--136.
+
+\leavevmode\hypertarget{ref-kim2017}{}%
+\textbf{Kim, J., Vasardani, M. \& Winter, S.} (\textbf{2017}) Landmark
+Extraction from Web-Harvested Place Descriptions. \emph{KI - Künstliche
+Intelligenz}. 31 (2). pp. 151--159.
+
+\leavevmode\hypertarget{ref-leidner2007}{}%
+\textbf{Leidner, J.L.} (\textbf{2007}) Toponym resolution in text:
+Annotation, evaluation and applications of spatial grounding. \emph{ACM
+SIGIR Forum}. 41 (2). pp. 124--126.
+
+\leavevmode\hypertarget{ref-leidner2011}{}%
+\textbf{Leidner, J.L. \& Lieberman, M.D.} (\textbf{2011}) Detecting
+geographical references in the form of place names and associated
+spatial natural language. \emph{SIGSPATIAL Special}. 3 (2). pp. 5--11.
+
+\leavevmode\hypertarget{ref-li2014}{}%
+\textbf{Li, C. \& Sun, A.} (\textbf{2014}) 'Fine-grained location
+extraction from tweets with temporal awareness', \emph{Proceedings of
+the 37th international ACM SIGIR conference on Research \& development
+in information retrieval - SIGIR '14}. Gold Coast, Queensland,
+Australia: ACM Press, 2014, pp. 43--52.
+
+\leavevmode\hypertarget{ref-lynch1960}{}%
+\textbf{Lynch, K.} (\textbf{1960}) OCLC: 255254857 \emph{The image of
+the city}. Publication of the Joint Center for Urban Studies Nachdr.
+Cambridge, Mass.: MIT PRESS.
+
+\leavevmode\hypertarget{ref-middleton2016}{}%
+\textbf{Middleton, S.E. \& Krivcovs, V.} (\textbf{2016}) Geoparsing and
+Geosemantics for Social Media: Spatio-Temporal Grounding of Content
+Propagating Rumours to support Trust and Veracity Analysis during
+Breaking News. \emph{ACM Transactions on Information Systems}. p. 27.
+
+\leavevmode\hypertarget{ref-moncla2014}{}%
+\textbf{Moncla, L., Renteria-Agualimpia, W., Nogueras-Iso, J. \& Gaio,
+M.} (\textbf{2014}) 'Geocoding for texts with fine-grain toponyms: An
+experiment on a geoparsed hiking descriptions corpus', \emph{Proceedings
+of the 22nd ACM SIGSPATIAL International Conference on Advances in
+Geographic Information Systems - SIGSPATIAL '14}. Dallas, Texas: ACM
+Press, 2014, pp. 183--192.
+
+\leavevmode\hypertarget{ref-montello2003}{}%
+\textbf{Montello, D.R., Goodchild, M.F., Gottsegen, J. \& Fohl, P.}
+(\textbf{2003}) \emph{Where's Downtown?: Behavioral Methods for
+Determining Referents of Vague Spatial Queries}. p. 20.
+
+\leavevmode\hypertarget{ref-rizzo2015}{}%
+\textbf{Rizzo, G. \& Cano, A.E.} (\textbf{2015}) \emph{Making Sense of
+Microposts (\#Microposts2015) Named Entity rEcognition \& Linking
+Challenge}. p. 10.
+
+\leavevmode\hypertarget{ref-roberts2010}{}%
+\textbf{Roberts, K.} (\textbf{2010}) \emph{Toponym Disambiguation Using
+Events}. p. 6.
+
+\leavevmode\hypertarget{ref-scheider2013}{}%
+\textbf{Scheider, S. \& Purves, R.} (\textbf{2013}) 'Semantic place
+localization from narratives', \emph{Proceedings of The First ACM
+SIGSPATIAL International Workshop on Computational Models of Place -
+COMP '13}. Orlando FL, USA: ACM Press, 2013, pp. 16--19.
+
+\leavevmode\hypertarget{ref-speriosu2013}{}%
+\textbf{Speriosu, M.} (\textbf{2013}) \emph{Methods and Applications of
+Text-Driven Toponym Resolution with Indirect Supervision}. p. 173.
+
+\leavevmode\hypertarget{ref-stock2013}{}%
+\textbf{Stock, K., Pasley, R.C., Gardner, Z., Brindley, P., Morley, J.
+\& Cialone, C.} (\textbf{2013}) 'Creating a corpus of geospatial natural
+language', \emph{International Conference on Spatial Information
+Theory}. Springer, 2013, pp. 279--298.
+
+\leavevmode\hypertarget{ref-sun2019a}{}%
+\textbf{Sun, K., Zhu, Y., Pan, P., Hou, Z., Wang, D., Li, W. \& Song,
+J.} (\textbf{2019}) Geospatial data ontology: The semantic foundation of
+geospatial data integration and sharing. \emph{Big Earth Data}. 3 (3).
+pp. 269--296.
+
+\leavevmode\hypertarget{ref-tobin2010}{}%
+\textbf{Tobin, R., Grover, C., Byrne, K., Reid, J. \& Walsh, J.}
+(\textbf{2010}) 'Evaluation of georeferencing', \emph{Proceedings of the
+6th Workshop on Geographic Information Retrieval - GIR '10}. Zurich,
+Switzerland: ACM Press, 2010, p. 1.
+
+\leavevmode\hypertarget{ref-wallgrun2018}{}%
+\textbf{Wallgrün, J.O., Karimzadeh, M., MacEachren, A.M. \& Pezanowski,
+S.} (\textbf{2018}) GeoCorpora: Building a corpus to test and train
+microblog geoparsers. \emph{International Journal of Geographical
+Information Science}. 32 (1). pp. 1--29.
+
+\leavevmode\hypertarget{ref-weissenbacher2019}{}%
+\textbf{Weissenbacher, D., Magge, A., O'Connor, K., Scotch, M. \&
+Gonzalez-Hernandez, G.} (\textbf{2019}) 'SemEval-2019 Task 12: Toponym
+Resolution in Scientific Papers', \emph{Proceedings of the 13th
+International Workshop on Semantic Evaluation}. Minneapolis, Minnesota,
+USA: Association for Computational Linguistics, 2019, pp. 907--916.
+
+\leavevmode\hypertarget{ref-weissenbacher2015}{}%
+\textbf{Weissenbacher, D., Tahsin, T., Beard, R., Figaro, M., Rivera,
+R., Scotch, M. \& Gonzalez, G.} (\textbf{2015}) Knowledge-driven
+geospatial location resolution for phylogeographic models of virus
+migration. \emph{Bioinformatics}. 31 (12). pp. i348--i356.
+
+\leavevmode\hypertarget{ref-wolter2018}{}%
+\textbf{Wolter, D. \& Yousaf, M.} (\textbf{2018}) 'Context and Vagueness
+in Automated Interpretation of Place Description: A Computational
+Model', P. Fogliaroni, A. Ballatore, \& E. Clementini (eds.).
+\emph{Proceedings of Workshops and Posters at the 13th International
+Conference on Spatial Information Theory (COSIT 2017)}. Cham: Springer
+International Publishing, pp. 137--142.
+
+\leavevmode\hypertarget{ref-zhang2014}{}%
+\textbf{Zhang, W. \& Gelernter, J.} (\textbf{2014}) Geocoding location
+expressions in Twitter messages: A preference learning method.
+\emph{Journal of Spatial Information Science}. (9). pp. 37--70.
+\end{cslreferences}
+
+
+
+
+\end{document}
+
+\makeatletter
+\def\@maketitle{%
+  \newpage
+%  \null
+%  \vskip 2em%
+%  \begin{center}%
+  \let \footnote \thanks
+    {\fontsize{18}{20}\selectfont\raggedright  \setlength{\parindent}{0pt} \@title \par}%
+}
+%\fi
+\makeatother

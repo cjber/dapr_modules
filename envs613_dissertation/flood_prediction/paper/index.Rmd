@@ -1,0 +1,44 @@
+---
+author: '201374125'
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+degree: 'Data Analytics and Society PhD'
+title: 'Using Transformers to Extract Relevant Information From Twitter During Flood Events'
+abstract: |
+    `r if(knitr:::is_latex_output()) paste(readLines("00_abstract/abstract.Rmd"), collapse = '\n  ')`
+keywords: 'twitter; text classification; flooding'
+output:
+  pdf_document:
+    latex_engine: xelatex
+    template: ./template/template.tex
+    keep_tex: true
+    includes:
+        after_body: appendix.Rmd
+
+bibliography:
+    - bib/main.bib
+---
+
+```{r readLines("./scripts/defaults.R"), echo=FALSE}
+cjrmd::default_latex_chunk_opts(cache = FALSE)
+knitr::knit_hooks$set(crop = knitr::hook_pdfcrop)
+```
+
+
+\chapter{Introduction}
+```{r introduction, child = "01_introduction/introduction.Rmd"}
+```
+\chapter{Literature Review}
+```{r literature, child = "02_literature/literature.Rmd"}
+```
+\chapter{Methodology}
+```{r methods, child = "03_methods/methods.Rmd"}
+```
+\chapter{Results}
+```{r results, child = "04_results/results.Rmd"}
+```
+
+\chapter{Discussion}
+```{r results, child = "05_discussion/discussion.Rmd"}
+```
+
+\chapter*{Bibliography}

@@ -1,0 +1,132 @@
+---
+output:
+  pdf_document:
+    keep_tex: false
+    fig_caption: yes
+    latex_engine: xelatex
+    template: ./template.tex
+geometry: margin=1in
+header-includes:
+   - \linespread{1.05}
+
+title: "K Means Assessment"
+author: 201374125
+
+fontsize: 11pt
+---
+
+```{r, echo=F}
+library(knitr)
+opts_knit$set(self.contained = TRUE)
+
+# Defaults
+opts_chunk$set(
+    fig.align = "center", fig.pos = "tb",
+    cache = TRUE,
+    cache.path = "data/cache/",
+    message = FALSE, size = "footnotesize",
+    background = rgb(0.97, 0.97, 0.97),
+    warning = FALSE,
+    comment = NA, out.width = ".75\\linewidth"
+)
+reticulate::py_config()
+```
+
+# Task 1
+
+See `kmeans.py`.
+
+
+# Task 2
+
+```{python}
+import kmeans
+import pandas as pd
+import matplotlib.pyplot as plt
+import matplotlib
+
+matplotlib.rcParams['font.sans-serif'] = ['XCharter', 'sans-serif']
+
+cats = ['animals', 'countries', 'fruits', 'veggies']
+df = kmeans.read_data(cats)
+```
+
+```{python}
+score = {}
+for k in range(1, 11):
+    km = kmeans.K_Means(data=df, k=k)
+    word_clusters = km.fit()
+    score[k] = {'precision': km.precision,
+                'recall': km.recall,
+                'f_score': km.f_score}
+score = pd.DataFrame(score).T
+score.plot()
+```
+
+
+# Task 3
+
+```{python}
+score = {}
+for k in range(1, 11):
+    km = kmeans.K_Means(data=df, k=k, normalised=True)
+    word_clusters = km.fit()
+    score[k] = {'precision': km.precision,
+                'recall': km.recall,
+                'f_score': km.f_score}
+score = pd.DataFrame(score).T
+score.plot()
+```
+
+
+# Task 4
+
+```{python}
+score = {}
+for k in range(1, 11):
+    km = kmeans.K_Means(data=df, k=k, distance='manhattan_distance')
+    word_clusters = km.fit()
+    score[k] = {'precision': km.precision,
+                'recall': km.recall,
+                'f_score': km.f_score}
+score = pd.DataFrame(score).T
+score.plot()
+```
+
+# Task 5
+
+```{python}
+score = {}
+for k in range(1, 11):
+    km = kmeans.K_Means(data=df,
+                 k=k,
+                 distance='manhattan_distance',
+                 normalised=True)
+    word_clusters = km.fit()
+    score[k] = {'precision': km.precision,
+                'recall': km.recall,
+                'f_score': km.f_score}
+score = pd.DataFrame(score).T
+score.plot()
+```
+
+# Task 6
+
+```{python}
+score = {}
+for k in range(1, 11):
+    km = kmeans.K_Means(data=df,
+                 k=k,
+                 distance='cosine_distance',
+                 normalised=True)
+    word_clusters = km.fit()
+    score[k] = {'precision': km.precision,
+                'recall': km.recall,
+                'f_score': km.f_score}
+score = pd.DataFrame(score).T
+score.plot()
+```
+
+# Task 7
+
+The best result is given by the highest F Score, this appears to be the unnormalised Manhattan distance with 4 clusters from task 4. However, it should be noted that without a set seed, these results vary wildly.

@@ -1,0 +1,123 @@
+---
+output:
+  pdf_document:
+    keep_tex: false
+    fig_caption: yes
+    latex_engine: xelatex
+    template: ./template.tex
+geometry: margin=1in
+header-includes:
+   - \linespread{1.05}
+
+title: "Batch Data Analytics"
+author: 201374125
+
+fontsize: 12pt
+---
+
+```{r, echo=F}
+library(knitr)
+opts_knit$set(self.contained = TRUE)
+
+# Defaults
+opts_chunk$set(
+    fig.align = "center", fig.pos = "tb",
+    cache = TRUE,
+    cache.path = "data/cache/",
+    message = FALSE, size = "footnotesize",
+    background = rgb(0.97, 0.97, 0.97),
+    warning = FALSE,
+    comment = NA, out.width = ".75\\linewidth"
+)
+```
+
+# Middleware Configuration
+
+This report uses Apache Spark Resilient Distributed Datasets (RDDs) with operations run on a Google Dataproc cluster. The Dataproc cluster was created in a minimal form, with one master node and two worker nodes, each running `n1-standard-2` which has 2 vCPUs, 7.5GB memory, and 100GB disk space. The script itself is written in python using `pyspark`, and can either be ran locally by executing `$SPARK_HOME/bin/spark-submit a1_spark.py`, or using the Dataproc cluster with `gcloud` command line utilities: `gcloud dataproc jobs submit pyspark a1_spark.py`. The cluster name, region and credentials used in this command are all preset using the `gcloud` tool. The CSV datafile is hosted directly on a Google Cloud server when running through Dataproc.
+
+# Data Analytic Design
+
+The `pyspark` SQL module provided `SparkSession` which has the ability to create a `Dataframe` directly from `.csv` files using the `spark.read.csv()` function where `spark = SparkSession(...)`. The `DataFrame` is typically used for structured processing and resembles tables from database systems. The head of the dataframe may be viewed using `df.show()`, and the schema printed with `df.printSchema()`. `DataFrame`content can be easily moved to a `pyspark.RDD` of `Row` (rows of data in the dataframe) by calling `DataFrame.rdd`. From this `rdd` any `rdd` function may be performed on each row.
+
+The `rdd.filter` function was used to remove any empty values present in any row by converting each `Row` into a dictionary and checking for empty values `rdd.filter(lambda row: None not in row.asDict().values())`. 
+
+The highest total deaths for each country was found by first mapping the Rows into key values pairs $<k,v>$ where $k='location'$ and $v='total\_deaths'$. `rdd.map` was again used to take the `max` value for each pair.
+
+Finally the highest total cases for each country was found by mapping Rows into key values pairs $k='location'$, $v='total\_cases'$. `rdd.map` again used to get max value for each pair. Following this, the `rdd.max` and `rdd.min` functions were used to get the maximum and minimum values for this `RDD`.
+
+The following diagram gives an overview of this dataflow:
+
+```{r dataflow, echo=FALSE, eval=TRUE, out.width="\\linewidth"}
+knitr::include_graphics("./figs/dataflow.pdf")
+```
+# Results and Discussion
+
+This DataFrame has 53,087 rows, filtering removed 13,113 rows with empty values, leaving 39,974 rows.
+
+Highest total death cases per country:
+
+|            Country|    Max Total Deaths|
+|--------------|------|
+| United States|226723|
+|        Brazil|157946|
+|         India|120010|
+|        Mexico| 89814|
+|United Kingdom| 45365|
+|         Italy| 37700|
+|        France| 35541|
+|         Spain| 35298|
+|          Peru| 34257|
+|          Iran| 33299|
+|      Colombia| 30565|
+|     Argentina| 29730|
+|        Russia| 26589|
+|  South Africa| 19053|
+|         Chile| 14026|
+|     Indonesia| 13512|
+|       Ecuador| 12588|
+|       Belgium| 10921|
+|          Iraq| 10724|
+|       Germany| 10183|
+
+Max total cases by country:
+
+United States: 8,779,653
+
+Min total cases by country:
+
+Montserrat: 13
+
+Table showing 20 countries:
+
+
+|            Country|     Max total cases|
+|--------------|-------|
+| United States|8779653|
+|         India|7990322|
+|        Brazil|5439641|
+|        Russia|1547774|
+|        France|1198695|
+|         Spain|1116738|
+|     Argentina|1116596|
+|      Colombia|1033218|
+|United Kingdom| 917575|
+|        Mexico| 901268|
+|          Peru| 892497|
+|  South Africa| 717851|
+|          Iran| 581824|
+|         Italy| 564778|
+|         Chile| 504525|
+|       Germany| 464239|
+|          Iraq| 459908|
+|    Bangladesh| 401586|
+|     Indonesia| 396454|
+|   Philippines| 373144|
+
+# Conclusions and Recommendations
+
+Google Dataproc allows for building large scale clusters with a specified number of worker nodes. For larger scale projects the number of workers could be increased depending on the volume of data. The power of each machine could also be increased to speed up processes on individual partitions, Dataproc has machines with up to 224 cores and 224 GB memory. Disk space could also be increased.
+
+# Script Appendix
+
+```{python, code=xfun::read_utf8('a1_spark.py'), eval=FALSE, echo=TRUE}
+```

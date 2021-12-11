@@ -1,0 +1,140 @@
+```{python}
+from sklearn.preprocessing import scale
+from pandas.api.types import CategoricalDtype
+import statsmodels.formula.api as sm
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+from sklearn import metrics
+
+
+df = pd.read_csv('./data/derived/cars_01_cleaned.csv', index_col=0)
+cat_vars = [
+    "vehicleType",
+    "gearbox",
+    "fuelType",
+    "brand",
+    "area"
+]
+```
+
+```{python}
+"""
+Linear Regression with SkLearn
+"""
+
+# get dummies
+df_dummies = pd.get_dummies(df, drop_first=True)
+# Price is skewed so create a log variable
+df_dummies['log_price'] = np.log1p(df['price'])
+
+
+def linear_models(df_dummies, cols):
+    regressor = LinearRegression()
+    lm = regressor.fit(df_dummies, df_dummies[cols])
+    lm_lbls = lm.predict(df_dummies)
+    rf = RandomForestRegressor(n_estimators=100, max_features=None)
+    rf.fit(df_dummies, df_dummies[cols])
+    rf_lbls = rf.predict(df_dummies)
+    return lm_lbls, rf_lbls
+
+
+cols = ['price', 'log_price']
+linear_models, rf_models = zip(*
+                               [linear_models(df_dummies=df_dummies, cols=col)
+                                for col in cols]
+                               )
+
+res = pd.DataFrame({"LM-Raw": linear_models[0],
+                    "RF-Raw": rf_models[0],
+                    "Truth": df_dummies['price'],
+                    "RF-Log": rf_models[1],
+                    "LM-Log": linear_models[1],
+                    "Truth-Log": df_dummies['log_price']
+                    })
+res.to_csv("./data/derived/lm_results.csv")
+```
+
+```{python}
+"""
+Inference
+"""
+```
+```{python}
+df['log_price'] = np.log1p(df['price'])
+
+# base maximal model
+m1_vars = 'log_price ~\
+        vehicleType +\
+        gearbox +\
+        powerPS +\
+        kilometer +\
+        fuelType +\
+        damaged +\
+        age +\
+        area'
+
+m1 = sm.ols(m1_vars, df)\
+    .fit()
+
+# retain the select most influential vars
+# excluding area, vehicletype, gearbox
+m2_vars = 'log_price ~\
+        powerPS +\
+        kilometer +\
+        fuelType +\
+        damaged +\
+        age'
+
+m2 = sm.ols(
+    m2_vars, df)\
+    .fit()
+
+# predictive checking
+
+
+def plt_lmodels(models, ax):
+    sns.kdeplot(df['log_price'], shade=True, ax=axs[ax], label='$y$')
+    sns.kdeplot(models.fittedvalues, shade=True,
+                ax=axs[ax], label='$\\hat{y}$')
+
+
+f, axs = plt.subplots(1, 2, figsize=(14, 6))
+models = [m1, m2]
+[plt_lmodels(model, i) for i, model in enumerate(models)]
+
+
+def annotate_axes(f, title, x_lab, y_lab):
+    for i, ax in enumerate(f.axes):
+        ax.tick_params(labelbottom=x_lab, labelleft=y_lab)
+        ax.set_title(title[i])
+
+
+annotate_axes(f, title=['Model 1', 'Model 2'], x_lab=False, y_lab=False)
+plt.show()
+
+# Model performance
+
+
+def model_performance(metric):
+    series = pd.Series({'Baseline': metric(df['log_price'],
+                                           m1.fittedvalues),
+                        'Minimal': metric(df['log_price'],
+                                          m2.fittedvalues)})
+    return series
+
+
+metric = [metrics.r2_score,
+          metrics.mean_squared_error,
+          metrics.mean_absolute_error]
+
+scores = [model_performance(score) for score in metric]
+
+# model performance
+pd.DataFrame({'$R^2$': scores[0],
+              'MSE': scores[1],
+              'MAE': scores[2]})
+```

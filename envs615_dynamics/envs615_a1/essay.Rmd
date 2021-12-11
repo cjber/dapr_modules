@@ -1,0 +1,722 @@
+---
+title: 'Exploring Online Car Listings Using SciKit Learn'
+author: '201347125'
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  bookdown::html_document2:
+    number_sections: false
+    toc: true
+    smooth_scroll: true
+    toc_float: true
+    css: theme/style.css
+    code_folding: show
+bibliography: /home/cjber/drive/bib/zbib.bib
+biblio-style: "apalike"
+link-citations: true
+...
+
+```{r chunk_opts, echo=FALSE}
+knitr::opts_chunk$set(
+    fig.align = "center",
+    cache = TRUE, echo = TRUE,
+    message = FALSE,
+    warning = FALSE,
+    results = "hide",
+    comment = NA
+)
+library(knitr)
+library(kableExtra)
+library(reticulate)
+```
+
+This essay presents the results of a python based machine learning exercise in which car prices scraped from Ebay listings are explored. The dataset is freely available from [Kaggle](https://www.kaggle.com/orgesleka/used-cars-database), under the [CC0](https://creativecommons.org/publicdomain/zero/1.0/) licence. It should be noted that significant amount of pre-cleaning was performed on this data to present it in a usable state for this assessment. For readability this pre-cleaning is included as an [Appendix](#data_cleaning).
+
+# Exploring the Data
+
+First the required libraries are loaded, including `pandas` for working with dataframes and `matplotlib` for plotting.
+
+```{python explore_libs}
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from pandas.api.types import CategoricalDtype  # convert var to categorical
+from typing import List  # for type checking
+```
+
+The data is then loaded in as a `pandas` dataframe, the continuous and categorical variables identified.
+
+```{python}
+# read in pre-cleaned car data, set index to first col
+df = pd.read_csv('./data/derived/cars_cleaned.csv', index_col=0)
+# list all continuous variables
+cont_vars = [
+    'price',
+    'age',
+    'powerPS',
+    'kilometer'
+]
+# list all categorical variables
+cat_vars = [
+    'vehicleType',
+    'gearbox',
+    'fuelType',
+    'area',
+    'brand'
+]
+```
+
+To explore the continuous variables, a histogram may be plotted for each.
+
+```{python}
+df[cont_vars].hist(bins=20)
+```
+
+```{python echo=FALSE}
+plt.show()
+```
+
+```{python echo=FALSE}
+pk = round(df['powerPS'].skew(), 2)
+pp = round(df['price'].skew(), 2)
+```
+
+This figure indicates there there appears to be a significant positive skew with the `price` variable, this positive skew is also apparent with `powerPS`. The skew may be measured with the pandas `.skew()` method; `powerPS` has a skew of `r py$pk`, while `price` has a skew of `r py$pp`. This skew will be explored later in the supervised learning section. Additionally `kilometer` shows gaps between certain bins, an unusual property for a continuous variable.
+
+Below is a table of the categorical variables using the pandas `describe()` method;
+
+```{python}
+cat_desc = pd.DataFrame(df[cat_vars].describe().T)
+```
+
+```{r results='show'}
+# r code for neat html tables
+py$cat_desc %>%
+    kable() %>%
+    kable_styling()
+```
+
+Both `area`, `brand`, `vehicleType` and `fuelType` contain a large number of categories, which contain spare numbers of values. For this reason a method was devised to remove categories containing fewer observations. The `top_cats` function provides the options for an input dataframe, the variable to reduce and the number of categories to keep, outputting the dataframe with rows excluded that were part of a removed category. `brand` is dropped due to the large sparsity of categories compared with other variables.
+
+```{python}
+df = df.drop(columns=['brand'])  # too many sparse categories
+cat_vars.remove('brand')
+
+
+def top_cats(df: pd.DataFrame, var: str, num: int):
+    """Keep a number of top categories from a categorical variable in a df.
+
+    Retain the top 'num' categories from a column 'var' in
+    a dataframe 'df', uses the total row count of each category.
+
+    Args:
+        df (pd.DataFrame): pandas dataframe
+        var (str): valid row name in df
+        num (int): cats to keep with size < total number of unique values in var
+    """
+    df = df[df[var].isin(
+        df[var]
+        .value_counts()
+        .head(num)
+        .index
+        .tolist())]
+    return df
+
+
+# keep only top two fuel groups, petrol and diesel
+df = top_cats(df=df, var='fuelType', num=2)
+# reduce the number of categories to 5 for others, removing the least used
+for var in cat_vars:
+    df = top_cats(df=df, var=var, num=5)
+```
+
+The `fuelType` variable was further reduced to only two categories, `petrol` and `diesel` as others contained very few observations. As noted previously, the `kilometer` variable doesn't appear to behave as a normal continuous variable. The unique values for `kilometer` are explored;
+
+```{python results="show"}
+# more like a categorical variable, and skewed to higher values
+df['kilometer'].value_counts()
+```
+
+Unlike a normal continuous variable, there are very few unique values, and many repeated values. For this reason it is perhaps more accurate to consider `kilometer` as an ordinal variable. First to reduce the number of categories, any value below 100,000 was contained within a new group (<100,000) and the variable converted into categoric.
+
+```{python}
+# combine lower kilometer values into one
+df.loc[:, 'kilometer'][df['kilometer'] < 100000] = "<100000"
+# change kilometer variable to categorical (doesn't need to be ordered)
+df.loc[:, 'kilometer'] = df.loc[:, 'kilometer']\
+    .astype(CategoricalDtype())
+
+# fix the cont and cat vars lists
+cont_vars.remove('kilometer')
+cat_vars.append('kilometer')
+```
+```{python echo=FALSE}
+rdf = len(df)
+```
+
+Following this cleaning, this dataset now contains `r py$rdf`.
+
+# Unsupervised Learning
+
+With the data cleaned appropriately, this section will explore a K Means clustering technique, and present methods for evaluating the number of $k$ clusters to choose, and how principal component analysis may improve clustering. First the appropriate libraries are loaded, `numpy` provides some simple mathematic expressions, `seaborn` is used for some more specific plotting and from the `sklearn` library, some preprocessing tools, the K Means and PCA functions, and two validation scores.
+
+```{python unsup_imports}
+import numpy as np
+import seaborn as sns
+
+from sklearn.preprocessing import scale, MinMaxScaler
+from sklearn.cluster import KMeans
+from sklearn.decomposition import PCA
+from sklearn.metrics import silhouette_score, calinski_harabasz_score
+```
+
+First the dataframe is standardised using the `scale` function from `seaborn.preprocessing`, producing another dataframe with values indicating their distance from the mean in standard deviations, relative to zero. A second dataframe is produced with range scaled values, transforming all values onto a scale from zero to one.
+
+```{python}
+# create a standardised dataframe using continuous vars
+df_std = scale(df[cont_vars])
+df_std = pd.DataFrame(df_std, index=df.index, columns=cont_vars)
+
+# create a range scaled dataframe using continuous vars
+range_scaler = MinMaxScaler()
+df_scaled = range_scaler.fit_transform(df[cont_vars])
+df_scaled = pd.DataFrame(df_scaled, index=df.index, columns=cont_vars)
+```
+
+To determine the optimal number of K means clusters to select, the Calinski Harabasz Score for each dataframe, and a varying number of clusters are plotted as a line graph. The `plot_elbow`^[The *Elbow Method* is commonly used to determine a suitable number of clusters. See <https://www.scikit-yb.org/en/latest/api/cluster/elbow.html>] function takes the input dataframe, a min and max number of clusters, in this case 2 and 11, and outputs a series containing the CH score for each number of clusters in that dataframe.
+
+```{python}
+df_norms = [df, df_std, df_scaled]  # list of raw df and normalised
+
+
+def plot_elbow(df: pd.DataFrame, mn: int, mx: int):
+    """Plot elbow method for selecting optimal k in k means.
+
+    Uses calinksi harabasz score to determine optimal number
+    of clusters in k means analysis.
+
+    Args:
+        df (pd.DataFrame): pandas df with continuous variables
+        mn (int): min number of clusters to attempt
+        mx (int): max number of cluster to attempt
+    """
+    chss = {}
+    # loop over min and max number of clusters
+    for n in range(mn, mx):
+        # init K means estimator, random state to keep same results
+        estimator = KMeans(n_clusters=n, random_state=3425)
+        estimator.fit(df[cont_vars])
+        chs = calinski_harabasz_score(df[cont_vars],
+                                      estimator.labels_)
+        chss[n] = chs
+    chss = pd.Series(chss)
+    return chss
+
+# list comprehension, output a list of series from plot_elbow() for each in df_norms
+plts = [plot_elbow(df, mn=2, mx=11) for df in df_norms]
+```
+
+Each series was then plotted;
+
+```{python}
+def annotate_axes(f, title: str, x_lab: bool, y_lab: bool):
+    """Easily annotate multiple axes
+
+    Allows for removing axes labels and adding individual titles
+    to multiple axes on the same figure at once.
+
+    Args:
+        f (Figure): matplotlib figure type
+        title (str): title per axes
+        x_lab (bool): show or hide x labs
+        y_lab (bool): show or hide y labs
+    """
+    for i, ax in enumerate(f.axes):
+        ax.tick_params(labelbottom=x_lab, labelleft=y_lab)
+        ax.set_title(title[i])
+
+f, ax = plt.subplots(1, 3)
+[plts[i].plot.line(ax=ax[i]) for i, _ in enumerate(plts)]
+
+
+annotate_axes(f, title=['Raw', 'Std', 'Scaled'], x_lab=True, y_lab=False)
+f.suptitle('Elbow Plots')
+plt.show()
+```
+
+This figure indicates that an optimal number of clusters is likely to be around 5, as the score at this number stops decreasing for both the standardised and scaled dataframe. Additionally, the lack of clear clusters for the non-transformed dataframe appear to indicate that due to the large variation in scales between variables, it is important to standardise them in order to reveal a pattern.
+
+## Evaluation of K Means Clusters
+
+With a suitable number of clusters chosen, the fit of this K Means clustering could now be assessed. First a function is defined to extract the $k$ labels from clustering performed on the three dataframes.
+
+```{python}
+# initial number of clusters
+def k5_fits(df: pd.DataFrame):
+    """Give KMeans labels for estimator
+
+    Retrieve kmeans 5 cluster estimator labels and
+    output a series.
+
+    Args:
+        df (pd.DataFrame): pandas df with vars for kmeans
+    """
+    global estimator  # allow this to be used outside this function
+    estimator = KMeans(n_clusters=5, random_state=3425)
+    estimator.fit(df[cont_vars])
+    k5_fits = pd.Series(estimator.labels_, index=df.index)
+    return k5_fits
+
+
+# fit raw/std/scaled model
+k5_fits = [k5_fits(df) for df in df_norms]
+```
+
+Following this, PCA may be performed on both the standardised and scaled dataframes, to obtain two derived components, the K Means labels for these additional dataframes are then retrieved.
+
+```{python}
+def k5_pca(df: pd.DataFrame):
+    """Transform vars to components and output kmeans
+
+    Use PCA to convert a number of vars to 2 components,
+    uses components to run a kmeans and output series
+
+    Args:
+        df (pd.DataFrame): pandas df with vars for kmeans
+    """
+    global pca_estimator
+    pca_estimator = PCA(n_components=2)
+    components = pca_estimator.fit_transform(df[cont_vars])
+    components = pd.DataFrame(components,
+                              index=df.index,
+                              columns=['C-1', 'C-2'])
+    estimator.fit(components)
+    k5_pca = pd.Series(estimator.labels_, index=components.index)
+    return k5_pca
+
+
+df_pca = [df_std, df_scaled]
+# fit pca_std/pca_scaled
+k5_pca = [k5_pca(df) for df in df_pca]
+
+k5_fits.extend(k5_pca)
+```
+
+These five series containing K Means labels are then plotted as scatter plots and compared.
+
+```{python}
+def plt_components(labs: pd.Series, ax):
+    """Represent KMeans clusters by 2d components
+
+    Takes the components from a 2d PCA and plots clusters
+    using these xy values on a scatter plot.
+
+    Args:
+        labs (pd.Series): k means labels
+        ax (AxesSubplot): specific type of subplot
+    """
+    # choose std df components for visualisations
+    components = pca_estimator.fit_transform(df_std[cont_vars])
+    components = pd.DataFrame(components,
+                              index=df.index,
+                              columns=['C-1', 'C-2'])
+    components.assign(labels=labs)\
+        .plot.scatter('C-1',
+                      'C-2',
+                      c='labels',
+                      s=1,
+                      cmap='Paired',
+                      colorbar=False,
+                      ax=ax)
+
+
+f = plt.figure()
+ax1 = plt.subplot2grid(shape=(2, 6), loc=(0, 0), colspan=2)
+ax2 = plt.subplot2grid((2, 6), (0, 2), colspan=2)
+ax3 = plt.subplot2grid((2, 6), (0, 4), colspan=2)
+ax4 = plt.subplot2grid((2, 6), (1, 1), colspan=2)
+ax5 = plt.subplot2grid((2, 6), (1, 3), colspan=2)
+axs = [ax1, ax2, ax3, ax4, ax5]
+
+# for each axes plot one of the k means labels
+for i, labs in enumerate(k5_fits):
+    plt_components(labs, axs[i])
+annotate_axes(f, title=['Raw', 'Std', 'Scaled', 'PCA-Std', 'PCA-Scaled'],
+              x_lab=False, y_lab=False)
+plt.show()
+```
+
+From these plots it appears qualitatively that the PCA - Standardised dataframe may produce the most appropriate K Means clusters. To quantitatively assess the K Means clusters, both the Calinski Harabasz, and Silhouette Scores may be compared between each. For both metrics, the higher the score the better.
+
+```{python results='show'}
+# use list comprehension to output a list of scores for each k means labels
+chs = [calinski_harabasz_score(df[cont_vars], k5) for k5 in k5_fits]
+ch_tab = pd.Series(
+     {
+         'Raw': chs[0],
+         'Standardised': chs[1],
+         'Scaled': chs[2],
+         'PCA Standardised': chs[3],
+         'PCA Scaled': chs[4]
+     })
+```
+
+```{python results='show'}
+
+def sil_scores(k5_fits: pd.Series):
+    """Calculate silhouette scores for k means clusters.
+
+    Take cluster labels as a series, a sample of the total data
+    and calculates the fit.
+
+    Args:
+        k5_fits (pd.Series): K Means labels
+    """
+    sil_scores = silhouette_score(
+        df[cont_vars],
+        k5_fits,
+        metric='euclidean',
+        sample_size=10000
+    )
+    return sil_scores
+
+
+sil_score = [sil_scores(fit) for fit in k5_fits]
+
+sil_tab = pd.Series(
+     {
+         'Raw': sil_score[0],
+         'Standardised': sil_score[1],
+         'Scaled': sil_score[2],
+         'PCA Standardised': sil_score[3],
+         'PCA Scaled': sil_score[4]
+     })
+
+# convert both scores to cols in a df
+scores_tab = pd.DataFrame()
+scores_tab['Calinski Scores'] = ch_tab
+scores_tab['Silhouette Scores'] = sil_tab
+```
+
+```{r results='show'}
+py$scores_tab %>%
+    kable() %>%
+    kable_styling()
+```
+
+Interestingly it appears that the raw dataframe gives the largest scores, however it should be noted that CH scoring considers the same ideologies as that of an ANOVA, i.e. clustered objects lie in euclidean space (As does the K Means algorithm). Therefore, as the raw dataframe contains continuous variables of significantly different scale, it would appear from a CH scoring point of view that there are well defined clusters, while in fact these are more an artefact of the euclidean distance produced due to the scale of different variables [Similarly apparent with the Silhouette scores; @calinski1974]. Ignoring the raw clusters, the highest scores are given by the non-PCA standardised and the regular standardised dataframe, as the removal of a PCA transformation reduces the complexity of the data transformation, the regular standardised dataframe clusters were visually explored;
+
+```{python}
+g = df_std[cont_vars]\
+    .groupby(k5_fits[1])
+sns.heatmap(g.mean(), cmap='viridis')
+plt.show()
+```
+
+Each cluster appears to be distinct in its own way. With cluster 0 showing newer cars which expectedly have a higher cost, and moderate power. Cluster 1 with lowish values for each, cluster 2 similar but with higher power. Cluster 3 the most expensive with very higher power and relatively new. Cluster 4 the oldest with both low power and price.
+
+# Supervised Learning
+
+Following the unsupervised K Means clustering, this section will explore supervised techniques from the `sklearn` python library. The first being a linear regression, followed by a random forest regression. These two techniques will be compared along with the suitability of models chosen.
+
+Both the linear regression and random forest models will attempt to determine an association with certain predictive variables in the dataset and the price of a vehicle.
+
+```{python sup_imports}
+import time  # benchmarking
+
+from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import r2_score
+from sklearn.metrics import mean_squared_error as mse
+from sklearn.model_selection import train_test_split, cross_val_score, GridSearchCV
+```
+
+## Linear Regression
+
+This section outlines a linear regression using variables in the dataset to determine the association with the outcome variable `price`. In order to utilise the categorical variables in this dataset, they are first converted into dummy variables using the pandas function `get_dummies`. Additionally, as noted above, the `price` outcome variable shows significant skew. Linear Regression inherently assumes a linear relationship between variables, and as such it is frequently accepted that given a positively skewed outcome variable, the log value gives a more linear relationship between it and the predictor variables [@benoit2011].
+
+The linear relationship defined here may therefore be defined as;
+
+$$
+\log \left(y_{i}\right)=\beta_{0}+\beta_{1} x_{1 i}+\cdots+\beta_{k} x_{k i}+e_{i}
+$$
+
+where $y$ is the outcome variable and $x_1, \dots, x_k$ are the predictor variables.
+
+```{python}
+# get dummies
+df_dummies = pd.get_dummies(df, drop_first=True)
+df_dummies['log_price'] = np.log(df_dummies['price'])
+
+# models using all variables and a select few
+m1_vars = list(df_dummies.columns.drop(['price', 'log_price']))
+m2_vars = ['powerPS', 'age', 'kilometer_125000',
+           'kilometer_150000', 'kilometer_<100000']
+m_vars = [m1_vars, m2_vars]
+```
+
+Two models are chosen, one with the maximum number of variables for analysis, called from here on the 'maximal model' [@crawley2015]. Another is chosen with the minimal number of variables considered to be important predictors for the vehicle price. The second model considers the principle of parsimony [@hawkins2004]; a model containing more than is necessary to function may lead to overfitting. Overfitting may take many forms, but in this case it may be interpreted as a model which corresponds too closely with the set of data used to produce it, and would therefore struggle to accurately predict additional data in a reliable way.
+
+To test for the presence of overfitting, the models are subject to cross-validation techniques. First the raw model is run, then the model is split into a test set and a training set. This technique trains the model using a subset of the dataset, and tests the model accuracy using a separate testing subset. This allows for any overfitting to be identified, as the accuracy would be expected to be much lower. Additionally a $k$-fold cross-validation is performed, which trains the model on five separate subsets of the data, and outputs the average error. The overall performance of the models are then assessed through the root mean square error (RMSE) for the raw, and cross-validation methods. Essentially, a model should be considered suitable if the mean square error is low and a similar value between each of the cross-validations.
+
+The function given below outputs the RMSE values for the raw model (expected to be the highest), the test/train split, and $k$-Fold. Additionally output is the $R^2$ value, and predicted price values for the entire dataset.
+
+```{python}
+def calc_models(m_vars: List[str]):
+    """Calculate linear regression and validatons
+
+    Outputs a base lm list of predictions and R^2, as well
+    as the base root mean square error, a test/train split rmse,
+    and k fold CV rmse
+
+    Args:
+        m_vars (str): list of vars to use in the lm
+    """
+    lm_estimator = LinearRegression()
+    lm = lm_estimator.fit(df_dummies[m_vars], df_dummies['log_price'])
+    lm_pred = lm.predict(df_dummies[m_vars])
+    r2 = r2_score(df_dummies['log_price'], lm_pred)
+    # model mse with no validation
+    base_mse = np.sqrt(mse(lm_pred, df_dummies['log_price']))
+
+    # Test/Train Split
+    x_train, x_test, y_train, y_test = train_test_split(df_dummies[m_vars],
+                                                        df_dummies['log_price'],
+                                                        test_size=0.8)
+    lm_estimator.fit(x_train, y_train)
+    lm_y_pred = lm_estimator.predict(x_test)
+    # model mse with test/train split
+    split_mse = np.sqrt(mse(y_test, lm_y_pred))
+
+    # $k$-fold CV
+    lm_kcv_mses = cross_val_score(LinearRegression(),
+                                  df_dummies[m_vars],
+                                  df_dummies["log_price"],
+                                  cv=5,
+                                  scoring="neg_mean_squared_error",
+                                  n_jobs=-1
+                                  )
+    # model mse with k-fold CV
+    k_mse = np.sqrt(-lm_kcv_mses).mean()
+    return base_mse, split_mse, k_mse, r2, lm_pred
+```
+
+The time taken for the function to run is given;
+
+```{python, results='show'}
+start = time.time()
+lm1_errors, lm2_errors = [calc_models(m) for m in m_vars]
+end = time.time()
+print(round(end - start, 2))
+```
+
+Usually this evaluates in around one second. The results are stored in a pandas dataframe;
+
+```{python}
+lm_tab = pd.DataFrame({
+    "LM Model 1":
+    {
+        "Base RMSE:": lm1_errors[0],
+        "Split RMSE:": lm1_errors[1],
+        "$k$-Fold RMSE:": lm1_errors[2],
+        "$R^2$:": lm1_errors[3]
+    },
+    "LM Model 2":
+    {
+        "Base RMSE:": lm2_errors[0],
+        "Split RMSE:": lm2_errors[1],
+        "$k$-Fold RMSE:": lm2_errors[2],
+        "$R^2$:": lm2_errors[3]
+    }
+})
+```
+
+These results will be accessed later to compare with the results of the random forest models.
+
+## Random Forest
+
+Unlike linear regression, random forests do not work under the assumption that the relationship between the outcome variable, and the predictor variables is linear. Random forests work much like decision trees, but aim to eliminate much of the problems associated with overfitting by repeating decision trees many times to create an average prediction that proves more accurate than the prediction of a single tree [@liaw2002].
+
+Random Forests are inherently far more computationally expensive than a simple linear regression, it is possible to speed up the computation time by utilising multiple CPU cores, indicated by the variable `n_jobs=-1` where -1 is the total number of cores on the system. Random forests also are customisable with certain parameters, and the optimal parameters may be selected through *parameter optimisation*. 
+
+In the following section, first a parameter grid is created, in this instance containing a variable number of estimators, and two methods for selecting the max number of features. When this is passed to the function `GridSearchCV`, cross validation will be used to determine the optimal parameter selection for the particular model being constructed.
+
+The function `rf_calc` combines the parameter optimisation with the RMSE scores for the base random forest models, both the maximal and minimal. Additionally the R$^2$ is calculated, the RMSE for a train/test cross validation, the RMSE for a $k$-Fold cross validation, and the predicted labels for the base model, as with the linear model function above.
+
+```{python}
+param_grid = {
+    "n_estimators": [5, 25, 50, 75, 100, 150],
+    "max_features": ['sqrt', 'log2']
+}
+
+grid = GridSearchCV(RandomForestRegressor(random_state=3534),
+                    param_grid,
+                    scoring="neg_mean_squared_error",
+                    cv=5,
+                    n_jobs=-1,
+                    )
+
+
+def rf_calc(m_vars: List[str]):
+    """Calculate Random Forest Regressor and Predictions
+
+    Outputs a base random forsest list of predictions and R^2, as well
+    as the base root mean square error, a test/train split rmse,
+    and k fold CV rmse
+
+    Args:
+        m_vars (str): list of vars to use in the rf
+    """
+    grid.fit(df_dummies[m_vars], df_dummies['log_price'])
+    rf_best = grid.best_estimator_
+
+    rf_best.fit(df_dummies[m_vars], df_dummies['log_price'])
+    rf_pred = rf_best.predict(df_dummies[m_vars])
+    rf_mse = np.sqrt(mse(rf_pred, df_dummies['log_price']))
+
+    r2 = r2_score(df_dummies['log_price'], rf_pred)
+
+    # test/train
+    x_train, x_test, y_train, y_test = train_test_split(df_dummies[m_vars],
+                                                        df_dummies['log_price'],
+                                                        test_size=0.8)
+    rf_best.fit(x_train, y_train)
+    rf_y_pred = rf_best.predict(x_test)
+
+    # mse with test/train split
+    rf_split_mse = np.sqrt(mse(y_test, rf_y_pred))
+
+    rf_kcv_mse = cross_val_score(rf_best,
+                                 df_dummies[m_vars],
+                                 df_dummies['log_price'],
+                                 cv=5,
+                                 scoring="neg_mean_squared_error")
+    rf_kcv_mse = np.sqrt(-rf_kcv_mse).mean()
+    return rf_mse, rf_split_mse, rf_kcv_mse, r2, rf_pred
+```
+
+The grid is fitted individually for both models to ensure the optimal parameters are altered if needed. This function is benchmarked for a comparison with the linear model;
+
+
+```{python, results='show'}
+start = time.time()
+rf1_errors, rf2_errors = [rf_calc(m) for m in m_vars]
+end = time.time()
+print(end - start)
+```
+
+It should be noted here that although this function almost replicates the steps involved in the linear model function, it takes significantly more time, even when utilising every CPU core (6). This is the main limitation when performing a random forest for such a large dataset.
+
+## Comparing RF and LM
+
+```{python}
+rf_tab = pd.DataFrame({
+    "RF Model 1":
+    {
+        "Base RMSE:": rf1_errors[0],
+        "Split RMSE:": rf1_errors[1],
+        "$k$-Fold RMSE:": rf1_errors[2],
+        "$R^2$:": rf1_errors[3]
+    },
+    "RF Model 2":
+    {
+        "Base RMSE:": rf2_errors[0],
+        "Split RMSE:": rf2_errors[1],
+        "$k$-Fold RMSE:": rf2_errors[2],
+        "$R^2$:": rf2_errors[3]
+    }
+})
+```
+
+```{r results='show'}
+model_tables <- list(py$lm_tab, py$rf_tab)
+
+model_tables %>%
+    kable(digits = 2) %>%
+    kable_styling()
+```
+
+Results reveal that the random errors with the RF models are generally far lower than the linear models as would be expected, possibly capturing non linear relationships. Additionally the RMSE for the Linear Model cross validation and raw model are similar, indicating that this model is unlikely to suffer from overfitting. This is not repeated for the RF model, as cross validation errors are double that of the base model with maximal variables. This is indicative of overfitting, and confirmed by the much lower disparity between the RMSE of the minimal model, and cross-validation. For this reason, the prediction of external data may be more accurate by selecting the minimal RF model, over the maximal.
+
+```{python}
+def plt_pred(pred, ax):
+    """Plot predictions from models vs actual
+
+    Used to plot prediction comparsions for each model and each
+    the linear and random forest regressions.
+
+    Args:
+        pred (pd.Series): predictions
+        ax (np.ndarray): a single axes
+    """
+    sns.kdeplot(df_dummies['log_price'], shade=True, ax=ax, label='$y$')
+    sns.kdeplot(pred, shade=True, ax=ax, label='$\\hat{y}$')
+
+
+# here use list comphrehension over the predicted values
+# for both linear and rf models with the function above
+f, axs = plt.subplots(2, 2)
+lm_pred = [lm1_errors[4], lm2_errors[4]]
+[plt_pred(pred, axs[0, i]) for i, pred in enumerate(lm_pred)]
+
+rf_pred = [rf1_errors[4], rf2_errors[4]]
+[plt_pred(pred, axs[1, i]) for i, pred in enumerate(rf_pred)]
+```
+
+```{python results='show'}
+annotate_axes(f, title=['Linear Model 1', 'Linear Model 2',
+                        'Random Forest 1', 'Random Forest 2'], x_lab=True, y_lab=True)
+f.tight_layout()
+plt.show()
+```
+```{python, echo=FALSE}
+m1_len = len(m1_vars)
+m2_len = len(m2_vars)
+```
+
+A reduction from `r py$m1_len` to `r py$m2_len` between the two models doesn't appear to alter the outcome by much, and due to the principle of parsimony it is less likely to be overfit. There is clearly an issue with both linear models predicting values that are too centred around the most common log price values. This suggests that elements from the models which predict outliers are being lost. As the random forest models do not appear to suffer from this bias, this could mean that non-linear characteristics are being captured.
+
+
+## Testing Predictions
+
+This short section demonstrates the ability to predict a car price by using the minimal random forest model.
+
+```{python}
+import random
+
+# testing the model
+# choosing rf model 2
+test_vars = pd.DataFrame({'powerPS': [50, 450],
+                          'age': [16.0, 1.1],
+                          'kilometer_125000': [0, 0],
+                          'kilometer_150000': [1, 0],
+                          'kilometer_<100000': [0, 1]})
+
+def test_predictions(test_vars):
+    grid.fit(df_dummies[m2_vars], df_dummies['log_price'])
+    rf_best = grid.best_estimator_
+    x_train, x_test, y_train, y_test = train_test_split(df_dummies[m2_vars],
+                                                        df_dummies['log_price'],
+                                                        test_size=0.8)
+    rf_best.fit(x_train, y_train)
+    rf_y_pred = [round(x, 2) for x in list(rf_best.predict(test_vars))]
+
+    return rf_y_pred
+```
+
+```{python results='show'}
+np.exp(test_predictions(test_vars))  # seems reasonable
+```
+
+These values seem reasonable, indicating that it is likely that this model would do a good job of predicting car values from just the power, age, and number of kilometers driven.
+
+# Data Cleaning Appendix {#data_cleaning}
+
+```{r echo=FALSE, cache=FALSE}
+knitr::read_chunk("00_data_cleaning.py", labels = "00_data_cleaning")
+```
+
+```{r 00_data_cleaning, engine="python", eval=FALSE, cache=FALSE}
+
+```
+
+# Bibliography

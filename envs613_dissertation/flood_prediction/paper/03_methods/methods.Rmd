@@ -1,0 +1,160 @@
+The following section details the methodology involved in the extraction, classification and analysis of Tweets relating to historical _Severe_ flooding events in England. The first section, [Data Collection](#data-collection), outlines the extraction and cleaning of historic flood related data and Tweets. [Sequence Classification](#sequence-classification) describes the construction of a neural network transformer model to identify relevant Tweets from the corpus extracted from Twitter. [Spatio-Temporal Analysis of Tweets](#spatial-temporal-analysis-of-tweets) outlines analysis performed on the extracted Tweets, realising the information extractable that may be useful for emergency response.
+
+```{r, results = 'hide'}
+box::use(
+    here[here],
+    readr[read_csv],
+    sf[st_read],
+    dplyr[slice],
+    cjrmd,
+    kableExtra,
+    scales[comma]
+)
+```
+
+# Data Collection
+
+## Flood Data
+
+A historical dataset containing all _Severe Flood Warnings_, _Flood Warnings_, and _Flood Alerts_ issued by the [UK flood warning system](https://flood-warning-information.service.gov.uk/warnings) is available [here](https://data.gov.uk/dataset/d4fb2591-f4dd-4e7f-9aaf-49af94437b36/historic-flood-warnings) under the [Open Government Licence](http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). Table \ref{tab:fw} gives an example entry from this dataset.
+
+```{r fw}
+fw <- read_csv(here("data/floods/202104_flood_warnings.csv"))
+
+fw |>
+    slice(50000) |>
+    t() |>
+    cjrmd::make_latex_table(
+        caption = "Entry from the Historic Flood Warnings Dataset."
+    )
+
+fa <- st_read(here("data/floods/flood_areas.gpkg"), quiet = TRUE)
+```
+
+
+For each of these flood warnings, the `CODE` column was linked with _Flood Areas_ using the [Environment Agency Real Time Flood-Monitoring API](https://environment.data.gov.uk/flood-monitoring/doc/reference). These flood areas are large polygons representing catchment flood zones, and are the smallest resolution geographic area that may be associated with the _Historic Flood Warnings_ dataset. The following API query was used to obtain a full dataset of _Flood Areas_:
+
+> `http://environment.data.gov.uk/flood-monitoring/id/floodAreas?_limit=10000`
+
+```{r}
+fwp <- st_read(here("data/floods/flood_warnings.gpkg"), quiet = TRUE)
+```
+
+To reduce the volume of flood events being considered, only _Severe Flood Warnings_ occurring after 2010 were selected This left a total of `r nrow(fwp)` individual _Severe Flood Warning_ events. Figure \ref{fig:map} gives an overview of all flood zones, and the flood zones that were identified as having a _Severe Flood Warning_ within the historic flood warnings dataset.
+
+```{r map, fig.cap = "All flood zones and flood zones relevant to study highlighted in black.", code=readLines(here::here("paper/figures/XX_map.R"))}
+```
+
+## Twitter
+
+The [Twitter API v2](https://developer.twitter.com/en/docs/twitter-api/early-access) was used to extract Tweets from the full historic Tweet archive. For each flood warning the query was constructed using several requirements:
+
+* **Time-frame:** 7 days before to 7 days after flood warning
+* **Bounds:** Bounding box of the relevant flood area
+* **Parameters:** has _geography_, exclude retweets, exclude replies, exclude quotes
+
+The following gives an example of a query based on the outlined parameters:
+
+
+```{json, eval = FALSE, echo = TRUE}
+{
+    "endpoint": "https://api.twitter.com/2/tweets/search/all",
+    "request_parameters": {
+        "query": "has:geo bounding_box:[-5.21508 50.06655 -4.68482 50.36412]
+            -is:retweet -is:reply -is:quote",
+        "start_time": "2014-01-26T14:28:00Z",
+        "end_time": "2014-02-09T14:28:00Z",
+        "tweet.fields": "created_at",
+        "user.fields": "location",
+        "place.fields": "contained_within,country,country_code,full_name,geo,id,name,place_type"
+    },
+    "max_tweets": 500
+}
+```
+
+To evaluate the effectiveness of using keywords to identify flood related Tweets from Twitter, every Tweet retrieved that included a selection of keywords were labelled as being flood related (_FLOOD_). Similarly, for all Tweets that did not contain this selection of keywords were labelled as _NOT_FLOOD_. The following keywords were used:
+
+> _flood_, _rain_, _storm_, _thunder_, _lightning_^[including words that share a stem, e.g. _flooding_, _raining_]
+
+Geographic information associated with every Tweet was required due to the decision to use bounding boxes to filter out irrelevant Tweets. The new Twitter API now uses a combination of factors to associate geographic coordinates with Tweets which overcomes the issues with limited availability of geotags found with many previous studies [@middleton2014;@carley2016;@morstatter2013]. Geography associated with a Tweet may now include either _geotags_, _user profile location_ or _locations mentioned in Tweet_.
+
+```{r ft}
+ft <- read_csv(here("data/floods/flood_tweets.csv"))
+```
+
+The total number of Tweets extracted was `r comma(nrow(ft))`, with an average `r round(nrow(ft) / nrow(fwp))` Tweets per flood warning. Tweets were extracted over a period of `r round(as.numeric(readLines(here('data/floods/time_taken.txt'))) / 60 / 60)` hours. Figure \ref{fig:timeline} shows the daily Tweet counts extracted for all days with at least one Tweet, with vertical lines indicating days with an issued flood warning.
+
+```{r timeline, fig.cap = "Timeline showing number of Tweets per day, excluding days with no Tweets retrieved. Vertical lines indicate a day with a severe flood warning."}
+box::use(
+    .. / figures / XX_test_timeline
+)
+
+XX_test_timeline$timeline_graph
+```
+
+# Sequence Classification
+
+```{r workflow, fig.cap="Overview of the model processing pipeline."}
+# made with app.diagrams.net
+knitr::include_graphics("figures/figure1_template.pdf")
+```
+
+
+Figure \ref{fig:workflow} gives an overview of the pipeline for classifying the Tweet corpus. The first stage consists of pre-processing the text in each Tweet, removing properties of the Tweets that may be difficult for the model to understand. Following pre-processing, a subset of Tweets were labelled for use in the model training procedure. Section \ref{pre-processing-labelling} outlines the pre-processing procedure for the full Tweet corpora, Section \ref{model-architecture} outlines the architecture of the model used, finally analysis of the model is presented in \ref{model-analysis}.
+
+## Pre-processing & Labelling
+
+Tweets are typically noisy, with informal language, misspellings and Twitter specific features like usernames prefixed with '@', hashtags '#', and URLs. The following pre-processing procedure is used to remove noise from Tweets, allowing for the subsequent model to focus on the important information conveyed through the remaining body of text.
+
+Usernames tagged in Tweets likely convey some information regarding the Tweet content, but due to the number of unique usernames on Twitter, a model is unlikely to have sufficient information to associate any properties with individual unique usernames. For this reason usernames were normalised, converting any word prepended by '@' into the special string '[USER]'.
+
+> `(@[A-Za-z0-9]+) -> [USER]`
+
+Similarly URLs often do not contain any information as a string, but may provide some context to the Tweet, any token starting with 'http' was converted to the special string '[HTTP]'.
+
+> `(http[A-Za-z0-9]+) -> [HTTP]`
+
+Unlike usernames however, hashtags do often provide key information that would be useful for the model to identify. For example a flood Tweet may contain the hashtag #CumbriaFloods. In order for the model to more easily identify words from hashtags, the '#' was removed, and each hashtag was split based on their capitalisation and surrounded in special characters '<' and '>', which allows words from a single hashtag to be grouped, while separating it from the rest of the Tweet [@pota2020].
+
+> `~~#~~<(?=[A-Z])>`
+
+> `#CumbriaFloods -> <Cumbria Floods>`
+
+Often Tweets may be very short, or contain no text excluding a URL, therefore Tweets below 10 characters were removed.
+
+```{r}
+training <- read_csv(here("data/train/labelled.csv"))
+tte <- read_csv(here("data/train/test.csv"))
+```
+
+For use in a flood Tweet classification model, a subset of 2,000 Tweets were taken to be manually labelled. From this 10% was kept back for validation. Additionally, a testing dataset was kept back for model testing following training, and further analysis with `r nrow(tte)` Tweets. Manual labelling was assisted through the open source annotation tool [Doccano](https://github.com/doccano/doccano) [@nakayama2018]. When labelling, anything directly related to the flood event was considered to be 'relevant', and therefore given the positive label of _FLOOD_. This follows similar rules noted by @debruijn2020, including all rescue and support operations, mentions of flood water movement, and related extreme weather.
+
+## Model Architecture
+
+Sequence classification is an established NLP task in which a sequence of tokens ($\mathbf{x} = \{x_{0}, x_{1}\dots x_{n}\})$ are associated with a single classification ($\mathit{y}$). In this case, the model constructed uses a pre-trained RoBERTa transformer model as a base. Unlike general use transformers which use a variety of corpora, this models pre-training procedure used only a corpus of 58 million Tweets, as part of the _TweetEval_ benchmark task [@barbieri2020]. This model is available on the [Huggingface Model Hub](https://huggingface.co/cardiffnlp/twitter-roberta-base) [@wolf2020]. To use for sequence classification, this model was extended by pooling the output from the final transformer layer, feeding that into a linear layer with two outputs, one for each label (_FLOOD_, _NON\_FLOOD_). This model was developed using PyTorch [@paszke2019], with the PyTorch Lightning library [@falconwa2019].
+
+All weights in the model were updated each epoch during training to minimise the training loss. Performance was evaluated during training using the F~1~ metric on the separate validation data;
+
+$$
+F_{1}=\frac{2}{\text { recall }^{-1}+\text {precision }^{-1}}=2 \cdot \frac{\text { precision } \cdot \text { recall }}{\text { precision }+\text { recall }}=\frac{\operatorname{tp}}{\mathrm{tp}+\frac{1}{2}(\mathrm{fp}+\mathrm{fn})}
+$$
+
+To prevent training from continuing after performance had stopped improving, early stopping was used, completing training once the validation F~1~ score stopped improving. Once training had completed, the model weights that gave the best validation F~1~ score were selected to use in the model analysis section.
+
+## Model Analysis
+
+Once trained, the classification model was evaluated on the manually labelled test corpus, against the rule-based method which uses keywords to predict flood related Tweets with reference to the F~1~ score metric. Whichever performed best was selected to label flood related Tweets for the full corpus extracted for each flood event. Confusion-matrices for both are visualised to demonstrate the distribution of false positive and negatives for both models.
+
+Following this, the transformer model _attributions_ for each word in a few selected Tweets are visualised to identify the models ability to capture information relating to flood events, without having to explicitly be fed in key words. For this the Python library `transformers_interpret` was used. Attributions essentially relate the prediction of a deep neural network to its input features, an in-depth description on how this is achieved is given in [@sundararajan2017].
+
+# Spatio-temporal Analysis of Tweets
+
+## Extracting Geographic Entities
+
+Useful geographic information from text is usually present as place names. While many methods for place name identification choose to select place names based on formal corpora, the _Geographic Entity Recognition_ model available on the [HuggingFace Model Hub](https://huggingface.co/cjber/geographic-entity-recognition) considers the ability to identify any place name from text, regardless of whether it appears within formal datasets. This is useful as Twitter users may often use place names that are spelled incorrectly, are fine-grained locations that do not appear in general purpose datasets, or are informal, local names. As with the above sequence classification model, this model uses a pre-trained transformer base, fine-tuned with a set of labelled data. In this case the model was trained on annotated Wikipedia data relating to locations within the United Kingdom.
+
+Named Entity recognition is a subset of token classification, meaning a sequence of tokens ($\mathbf{x} = \{x_{0}, x_{1}\dots x_{n}\}$) are associted with their most likely sequence of tags of the same length ($\mathbf{y} = \{y_{0}, y_{1}\dots y_{n}\}$), from a set number of tags, in this case _PLACE_ and _OTHER_. As each token embedding is classified with a tag, this model differs from the sequence classification model in that no pooling is required.
+
+## Temporal Analysis
+
+This analysis considers the time-frame for each event as the 7 day run up to the date where the major flood warning was made, to the following 7 days after this warning was made. General analysis is performed, observing how the frequency of Tweets both relevant and irrelevant varies over time and how place name usage varies over time.

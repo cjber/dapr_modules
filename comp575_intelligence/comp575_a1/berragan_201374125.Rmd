@@ -1,0 +1,215 @@
+---
+output:
+  pdf_document:
+    keep_tex: false
+    fig_caption: yes
+    latex_engine: xelatex
+geometry: margin=1in
+header-includes:
+   - \linespread{1.05}
+
+title: "Batch Data Analytics"
+author: 201374125
+
+fontsize: 10pt
+---
+
+```{r, echo=F}
+library(knitr)
+opts_knit$set(self.contained = TRUE)
+
+# Defaults
+opts_chunk$set(
+    fig.align = "center", fig.pos = "tb",
+    cache = FALSE,
+    cache.path = "data/cache/",
+    message = FALSE, size = "footnotesize",
+    background = rgb(0.97, 0.97, 0.97),
+    warning = FALSE,
+    comment = NA, out.width = ".75\\linewidth"
+)
+```
+
+# Part 1: Perceptron
+
+A perceptron is a classification algorithm that derives a hyperplane of $p$-dimensional space to separate a set of external stimuli into two classes $C_1$ or $C_2$. This hyperplane is the decision boundary and as such correct classification relies on linearly separable data.
+
+Error-correction learning is used for training, adjusting weights to position the decision boundary. For example, for a training dataset $D_{train}=\left\{\left(\mathbf{x}_{1}, d_{1}\right), \ldots,\left(\mathbf{x}_{s}, d_{s}\right)\right\}$ with $s$ samples, an $n$-dimensional input vector $\mathbf{x}_j$, and the desired output $\mathbf{d}_j$ where $\mathbf{d}_j \in \{C_1, C_2\}$. The perceptron attempts to find a vector $\mathbf{w}$ which satisfies the inequalities,
+
+$$
+\left\{\begin{array}{ll}
+\mathbf{w}^{\top} \mathbf{x}>0 & \forall \mathbf{x} \in \mathrm{D}_{1} \\
+\mathbf{w}^{\top} \mathbf{x} \leq 0 & \forall \mathbf{x} \in \mathrm{D}_{2}
+\end{array}\right\} \text { where: } \mathrm{D}_{1} \cap \mathrm{D}_{2}=\varnothing, \mathrm{D}_{1} \cup \mathrm{D}_{2}=\mathrm{D}_{\operatorname{train}}
+$$
+
+## Steps
+
+1. **Initialisation:** Set $t=1$, $w_1=0$ (or small random numbers), learning rate $\eta \in (0, 1]$
+2. **Activation:** Apply the sample input $\mathbf{x}_t$ to the neuron
+3. **Response:** Compute its response:
+
+$$
+\mathrm{y}(\mathrm{t})=\operatorname{signum}\left[\mathbf{w}(\mathrm{t})^{\mathrm{T}} \mathbf{x}(\mathrm{t})\right]
+$$
+
+4. **Adaptation:** Update current weight vector via:
+
+$$
+\begin{array}{l}
+\mathbf{w}(\mathrm{t}+1)=\mathbf{w}(\mathrm{t})+\eta \underbrace{[\mathrm{d}(\mathrm{t})-\mathrm{y}(\mathrm{t})}_{\text {error signal } \in\{0,+2\}} \mathbf{x}(\mathrm{t}) \\
+\mathrm{d}(\mathrm{t})=\left\{\begin{array}{cc}
++1 & \text { if } \mathbf{x}(\mathrm{t}) \text { belongs to } \mathrm{C}_{1} \\
+-1 & \text { if } \mathbf{x}(\mathrm{t}) \text { belongs to } \mathrm{C}_{2}
+\end{array}\right.
+\end{array}
+$$
+
+5. **Continuation:** Until all samples classified correctly, or maximum epochs reaches set $t=t+1$ and go to step 2.
+
+The perceptron architecture was implemented from scratch using the `Python` programming language with the `numpy` library to assist with working with numerical arrays. This code is shown on the following page:
+
+\newpage
+
+```{python, code=xfun::read_utf8('perceptron.py'), eval=FALSE, echo=TRUE}
+```
+\newpage
+
+The `Perceptron` class is initialised with the user specified max number of epochs and the learning rate. In this implementation, the number of desired inputs and outputs are determined automatically based on the shape of the input data and labels. The `predict` method implements the activation function
+
+$$
+\mathrm{g}(\mathrm{z})=\left\{\begin{array}{ll}
+1, & \text { if } z \geq 0 \\
+-1, & \text { otherwise }
+\end{array}\right.,
+$$
+
+and
+
+$$
+z=\sum_{j=0}^{m} x_{j} w_{j} + b=w^{T} x + b,
+$$
+
+here, $w$ is the weight vector and $x$ is a sample vector from the training dataset, and $b$ is a bias value:
+
+$$
+w=\left[\begin{array}{c}
+w_{1} \\
+\vdots \\
+w_{m}
+\end{array}\right] \quad x=\left[\begin{array}{c}
+x_{1} \\
+\vdots \\
+x_{m}
+\end{array}\right]
+$$
+
+In this implementation the bias is incorporated as $w_0$.
+
+Weights are updated in the `train` method over a user-specified number of epochs. For each sample $x^i$ in the training vector, weights are updated $w_j = w_j + \Delta w_j$ where
+
+$$
+\Delta w_{j}=\eta\left(\text { target }^{i}-\text { output }^{i}\right) x_{j}^{i}
+$$
+
+here, $\eta$ is the learning rate.
+
+The `plot` method takes the first two features of the input data, the hyperplane derived from the learned weights, and plots them in relation to each other. This allows the decision boundary to be visualised.
+
+The following code demonstrates the Perceptron, initialised with a maximum of 10 epochs, and a learning rate of 0.01.
+
+```{python}
+import numpy as np
+
+from perceptron import Perceptron
+from sklearn.datasets import make_blobs
+
+perceptron = Perceptron(num_epochs=10, lr=0.01)
+```
+
+First the perceptron is trained on randomly generated linearly separable data with 1,000 samples, and two output features:
+
+```{python}
+X, y = make_blobs(n_samples=1000, centers=2, n_features=2, random_state=100)
+perceptron.train(X, y)
+```
+
+The following plot visualises the decision boundary for this trained perceptron.
+
+```{python}
+perceptron.plot()
+```
+This model may now be used to make a classification prediction.
+
+```{python}
+perceptron.predict(np.array([8, -2]))
+```
+
+Here is an example with a much large dataset, and demonstrates the ability for the Perceptron to automatically scale with the number of features.
+
+```{python}
+X, y = make_blobs(n_samples=10_000, centers=2, n_features=100, random_state=100)
+perceptron.train(X, y)
+```
+
+Finally, here is a dataset that isn't linearly separable, so accuracy is poor.
+
+```{python}
+X, y = make_blobs(n_samples=10_000, centers=4, n_features=2, random_state=100)
+perceptron.train(X, y)
+```
+
+# Part 2: Multi-layer Perceptron
+
+Multi-layer perceptrons (MLP) have non-linear activation functions which are differentiable. While smooth activation functions like the sigmoid ($S(x) = \frac{1}{1+e^{-x}}$) were once popular, it is now more common to use the simpler ReLU ($\max (0, x)$) which is easier to compute and prevents issues like exploding or vanishing gradients. Unlike single-layer perceptrons (SLP), MLPs have one or more 'hidden' layers of neurons, which allows for more complex, non-linear relationships to be learnt, meaning MLPs can solve problems like _XOR_ that are not solvable by SLPs. Each node can receive input from any other node in the previous layer, meaning they have high degrees of connectivity.
+
+Backpropagation (BP) is used for training MLPs which computes the gradients of a cost function with respect to the weights in each neuron, which are then updated to minimise the loss. The chain rule is used to calculate gradients using derivatives, starting with the final layer and moving towards the first one.
+
+Backpropagation may be split into a forward and backward pass:
+
+* **Forward Pass**
+    - Weights fixed
+    - Start at first hidden layer, for all neurons calculate outputs and ILFs: $\mathrm{y}_{\mathrm{j}}(\mathrm{n})=\phi_{\mathrm{j}}\left[\mathrm{v}_{\mathrm{j}}(\mathrm{n})\right] \quad \mathrm{v}_{\mathrm{j}}(\mathrm{n})=\sum_{\mathrm{i}-0}^{\mathrm{p}} \mathrm{w}_{\mathrm{ji}}(\mathrm{n}) \mathrm{y}_{\mathrm{i}}(\mathrm{n})$
+    - Move to each layer until reaching output layer
+
+* **Backward pass**
+    - Start from output layer, working backwards to first hidden layer
+    - All input signals to nodes are fixed
+    - For each node in the current layer, calculate local gradient:
+        * $\delta_{j}(n)=e_{j}(n) \phi_{j}^{\prime}\left[v_{j}(n)\right]$ for output layer
+        * $\delta_{j}(n)=\phi_{j}^{\prime}\left[v_{j}(n)\right] \sum_{k} \delta_{k}(n) w_{k j}(n)$ for hidden layers
+    - All local gradients are used to update weights using $\Delta \mathrm{w}_{\mathrm{ji}}(\mathrm{n})=-\eta \frac{\partial \mathrm{E}(\mathrm{n})}{\partial \mathrm{w}_{\mathrm{ji}}(\mathrm{n})}=\eta \delta_{\mathrm{j}}(\mathrm{n}) \mathrm{y}_{\mathrm{i}}(\mathrm{n})$
+
+The following code snippet is an implementation of a MLP using python:
+
+```{python, code=xfun::read_utf8('mlp.py'), eval=FALSE, echo=TRUE}
+```
+
+There is a small bug that prevents this network from working unfortunately, so for use in part 3 a MLP is creating using pytorch:
+
+```{python, code=xfun::read_utf8('mlp_pytorch.py'), eval=FALSE, echo=TRUE}
+```
+
+# Part 3: Genetic Algorithm
+
+A genetic algorithm is a type of search or optimisation techniques to mimic elements from natural genetics. They use natural selection to select members of a population that perform well at a specific task.
+
+1. Initialise a random starting population
+2. Repeat until convergence is satisfied
+   a. Evaluate the objective function F for all members
+   b. Calculate the fitness values f of all members
+   c. Perform parent selection based on their fitness probabilities
+   d. Apply crossover to selected parents to generate offspring
+   e. Apply mutation to offspring
+   f. Replace some parents with the offspring and create a new population
+
+3. Take the best individual and pass it as the final answer
+
+The following code shows the ability to create a simple swarm genetic algorithm using the `deap` python library. `deap` is a modern evolutionary algorithm library which focusses on prototyping and explicit structures.
+
+```{python, code=xfun::read_utf8('ga.py'), eval=FALSE, echo=TRUE}
+```
+
+The `generate` function first creates the initial population based on the parameters used in `creator.Create("Particle", ...)` (1), this population has the ability to learn one parameter 'Speed' which updates based on `FitnessMax`. Particles are updated to optimise the speed.
+
+`main` simulates population movement and calculates the objective function using `tools.Statistics(...)`. Unfortunately I do not know how to integrate this code with MLPs.

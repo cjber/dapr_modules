@@ -1,0 +1,121 @@
+# Classification Evaluation
+
+```{r lossgraph, fig.cap = "Evaluation metrics for transformer model during training, showing (A) Loss and (B) F1 Score."}
+box::use(
+    .. / figures / XX_metrics,
+    here[here],
+    readr[read_csv],
+    tidyr[drop_na],
+    dplyr[filter, mutate, group_by, count],
+    cowplot[ggdraw, draw_image],
+    patchwork[...],
+    ggplot2[...],
+    cjrmd[make_latex_table],
+    kableExtra[add_header_above]
+)
+
+(XX_metrics$loss_graph + ggtitle("(A)") | XX_metrics$f1_graph + ggtitle("(B)"))
+```
+
+Figures \ref{fig:lossgraph} (A) and (B) show the loss and F~1~ scores relating to the training and validation data as the model trained over 5 epochs (starting at epoch 0). Notably on Figure \ref{fig:lossgraph} (A) the training loss immediately drops to near zero, only slightly decreasing further over subsequent epochs, while the validation loss remains relatively uniform over all epochs. As the training loss drops so quickly, the validation loss never crosses above the training loss value, normally a stage at which model training is considered to be over-fit.
+
+```{r evaltable}
+box::use(
+    .. / figures / XX_confusion
+)
+XX_confusion$eval_table |>
+    t() |>
+    make_latex_table(
+        col_names = list("Transformer", "Rule-based"),
+        caption = "Rule-based against Transformer model evaluation metrics on testing corpus."
+    )
+```
+
+Table \ref{tab:evaltable} outlines various evaluation metrics for the Rule-based model against the fine-tuned Transformer model on the separate corpus of manually labelled Tweets for testing. Results overall are relatively similar, with a slight advantage across each metric by the transformer model, excluding the _Sensitivity_. The same value for this metric suggests that while the transformer model is able to more accurately identify when a Tweet relates to a flooding event, they perform similarly when attempting to correctly classify Tweets that are unrelated to flooding events.
+
+Most surprising is the performance of the transformer model on this testing data, relative to its performance on the validation data. In theory both are unseen datasets, so performance should be relatively similar, with only a slight favour towards the validation F1 due to the model selected being based on the highest validation F1 value. The discrepancy between a validation F1 score of around 0.98 and 0.88 for the testing data suggests there may be issues with the training corpus.
+
+A confusion matrix is given on Figure \ref{fig:confplot} showing both the rule-based and transformer model incorrectly classify 31 and 30 Tweets respectively as not flood related (false-negatives). The main difference between the two methods is that false-positives are more prevalent when using a rule-based approach, with 2 false-positives for the transformer model against 14 for the rule-based model. Figure \ref{fig:confplot} also demonstrates the large imbalance in the dataset, as while only 6\% of all Tweets are incorrectly classified as not flood related, this reflects 19.7\% of all the flood related Tweets in the corpus.
+
+```{r confplot, fig.cap = "Confusion matrices comparing the (A) Transformer model and the (B) Rule-based method. Central values represent the normalised count (overall percentage) and the count. Bottom values show the column percentage and right values show the row percentages."}
+box::use(
+    .. / figures / XX_confusion
+)
+XX_confusion$conf_model_plot + ggtitle("(A) Transformer") |
+    XX_confusion$conf_rule_plot + ggtitle("(B) Rule-based")
+```
+
+Figure \ref{fig:transformerviz} further explores the decisions made by the transformer model, using four example Tweets to demonstrate the _attribution_ given to each token when assigning a label. Figure \ref{fig:transformerviz} (A) first gives an example Tweet that is correctly identified as being flood related by the transformer, but does not contain any selected flood related keywords. In this example three keywords are highlighted as important by the model for its correct classification _gravel, river_ and _wier_. This suggests that the model is able to infer from context that these words relate to flooding, rather than having to be explicitly told.
+
+```{r transformerviz, fig.cap="Attribution levels for selected Tweets classified by the transformer model. Attribution label indicates the human annotated label, while predicted label shows the assigned label with a confidence level. Positive attributions indicate tokens that were used to assign the label given by the model, while negative does the opposite.", fig.height=6}
+tp <- ggdraw() +
+    draw_image(here("paper/figures/XX_transformer_viz_tp.png"))
+tn <- ggdraw() +
+    draw_image(here("paper/figures/XX_transformer_viz_tn.png"))
+rtp <- ggdraw() +
+    draw_image(here("paper/figures/XX_transformer_viz_rtp.png"))
+rtn <- ggdraw() +
+    draw_image(here("paper/figures/XX_transformer_viz_rtn.png"))
+
+(tp / tn / rtp / rtn) +
+    plot_annotation(tag_levels = "A", tag_prefix = "(", tag_suffix = ")")
+```
+
+
+In the second example on Figure \ref{fig:transformerviz} (B), an example is chosen where the model was able to correctly identify the Tweet as being unrelated to flooding, but contains the keyword _lightning_ which means the rule-based method incorrectly identified it as flood related. Several keywords again appear important for this correct classification, _finally_ which is unlikely to appear in Tweets relating to floods, in addition to _apples_ and _ipad pro_, both of which likely appear relatively frequently on Twitter, but never in flood related contexts.
+
+The final two figures give examples where the model gives incorrect classifications, but the rule-based method does not. Figure \ref{fig:transformerviz} (C) shows that while the model realises that _raining_ is a word positively associated with flooding, the rest of the sentence implies that the overall Tweet is likely not in reference to a flooding event. This example reflects the issue with selecting a broad annotation scheme, which considered mentions of weather that may relate to flooding events to be a positive match. A Tweet like this is relatively borderline, even for human annotation, meaning it is unsurprising that the model struggles to make a correct decision. This issue is also reflected in Figure \ref{fig:transformerviz} (D), the words _tide, mark_ and _kent_ are all identified as flood related words, which is likely true and the label reflects an issue with human annotation.
+
+Table \ref{tab:attributions} gives an overview of the average attribution given to words found within the full corpus of Tweets labelled as relating to flood events. The top two positive attributions are interesting, presenting the words _cyclone_ and _tornado_, both of which have strong semantic links with natural emergency events but were not considered for keywords.
+
+```{r attributions}
+pos_att <- read_csv(here("data/out/flood_pos.csv"))
+neg_att <- read_csv(here("data/out/flood_neg.csv"))
+
+att <- cbind(pos_att, neg_att)
+
+att |>
+    make_latex_table(
+        caption = "Top 10 positive and negative attributions relating to Tweets predicted as flood related from full corpus.",
+        align = c("l", "c", "l", "c")
+    ) |>
+    add_header_above(c("Positive" = 2, "Negative" = 2))
+```
+
+
+# Analysis of Tweets
+
+Figure \ref{fig:timeline} gives an overview of all Tweets extracted from the Twitter API per day, ignoring days when no Tweets were extracted, grey bars indicate days in which a severe flooding event was recorded. Notably, Tweeting frequency appears to drop off quickly after 2015.
+
+
+Figure \ref{fig:dailychange} shows temporal changes Tweets, starting 7 days before and ending 7 days following the date the Severe Flood Warning was issued. Figure \ref{fig:dailychange} (A) shows total Tweet numbers, with flood related Tweets automatically labelled. Unusually each day appears to have at least some flood related Tweets, only increasing notably in numbers on the date that the severe flood warning is issue, slowly tapering off over the next several days. Figure \ref{fig:dailychange} (B) shows how the number of places mentioned in Tweets varies over time. While the number of places mentioned in non-flood related Tweets says relatively uniform over time, there is a very large increase in the number of places mentioned in flood related Tweets on the date relating to severe flood warnings, and several days after. Notably, comparing these two graphs, the increase in place mentions is much larger relative to the increase in number of Tweets relating to floods, suggesting that flood related Tweets contain a much higher proportion of place names.
+
+```{r}
+ft <- read_csv(here("data/floods/flood_tweets.csv"))
+
+ft <- ft |>
+    mutate(
+        date = sub(" .*", "", ft$created_at),
+        warning_date = sub(" .*", "", ft$warning_time),
+        date_diff = as.Date(date) - as.Date(warning_date)
+    ) |>
+    drop_na() |>
+    group_by(idx) |>
+    count()
+```
+
+
+It should be noted that there is a large variance in the total number of Tweets extracted through Twitter over time as demonstrated on Figure \ref{fig:timeline}. Due to this the total number of Tweets extracted from each event varies significantly, for example the mean number of Tweets extracted from flooding events was `r round(mean(ft$n))`, with a median of `r median(ft$n)` a standard deviation of `r round(sd(ft$n))`, maximum of `r max(ft$n)` and minimum of `r min(ft$n)`.
+
+
+```{r dailychange, fig.cap = "(A) Total number of Tweets classified as flood related and not, starting 7 days before, to 7 days after severe flood warnings. (B) Total number of place names mentioned in both flood related and unrelated Tweets, starting 7 days before, to 7 days after severe flood warnings."}
+box::use(
+    .. / figures / XX_mean_tweets,
+    .. / figures / XX_sent,
+    .. / figures / XX_places,
+    patchwork[...]
+)
+
+XX_mean_tweets$mean_graph + ggtitle("(A)") |
+    XX_places$place_graph + ggtitle("(B)")
+```

@@ -1,0 +1,731 @@
+---
+title: 'Forecasting Sales'
+author: '201347125'
+date: '`r format(Sys.time(), "%d %B, %Y")`'
+output:
+  bookdown::html_document2:
+    number_sections: true
+    toc: true
+    smooth_scroll: true
+    css: theme/style.css
+    code_folding: show
+    highlight: tango
+bibliography:
+    - /home/cjber/drive/bib/zbib.bib
+    - bib/rbib.bib
+biblio-style: "apalike"
+link-citations: true
+---
+
+# Introduction
+
+This report demonstrates the preprocessing and sales forecasting task for a large collection of historical sales data, relating to a European drug store chain. The focus is primarily on the code and techniques required to pre-process the data into a state that is usable for later analysis. As such, the structure of this report will first give a descriptive narrative of the data pre-processing performed. Following this, a forecasting analysis will predict future sales figures for a set 6 week future time period, evaluated with the Root Mean Squared Percentage Error (RMSPE).
+
+Data preprocessing is considered an important aspect of data analytics, and one that is often neglected [@garcia2015]. In the context of this report, this stage of the analytical task includes the exploration of the data being considered; through direct observations, and visualisations, data cleaning; to remove erroneous data, data transformation; to ensure the existing data provides the best results, and data integration; the inclusion of external data.
+
+This document was written using [R Markdown](https://rmarkdown.rstudio.com/) [@rmarkdown1;@base], with the [Bookdown Package](https://github.com/rstudio/bookdown) [@bookdown1], and my custom theme based on [epuRate](https://github.com/holtzy/epuRate) [@epuRate]. Note that code chunks may be folded individually, or collectively using the top right button.
+
+# Data Preprocessing
+
+This section covers the data preprocessing exercise, performed entirely in the [Python programming language](https://python.org) [@vanrossum1995]. The below code chunk will automatically install and load the required R packages for producing this R Markdown document. This chunk also initiates a python virtual environment called `a1_sales` and installs the python packages required.
+
+```{r, message=FALSE, warning=FALSE}
+if (!require("pacman")) install.packages("pacman")
+pkgs <- c(
+    "bibtex",
+    "rmarkdown",
+    "bookdown",
+    "knitr",
+    "magrittr",
+    "reticulate"
+)
+pacman::p_load(pkgs, character.only = T)
+knitr::opts_chunk$set(
+    message = FALSE,
+    warning = FALSE,
+    comment = NA,
+    cache = TRUE
+)
+write.bib(pkgs, "bib/rbib.bib")
+write.bib(c("base", "epuRate"), "bib/rbib.bib", append = TRUE)
+
+python_packages <- c(
+    "numpy",
+    "matplotlib",
+    "seaborn",
+    "pandas",
+    "statsmodels",
+    "fbprophet"
+)
+reticulate::virtualenv_install(
+    envname = "a1_sales",
+    python_packages
+)
+```
+
+With the R and python environments correctly set up, the python packages required may be imported, for this section these include key libraries for plotting, dataframe manipulation and analysis. This report will use the optional `mypy` static type checking, which in some cases requires the use of the `typing` library. The [Gadfly](https://towardsdatascience.com/a-new-plot-theme-for-matplotlib-gadfly-2cffc745ff84) Matplotlib theme is used, which is inspired by the [Julia Programming Language theme](http://gadflyjl.org/stable/) of the same name. The python packages `numpy`, `matplotlib` and `pandas` are all part of the [SciPy](https://scipy.org) ecosystem [@virtanen2020], while `statsmodels` provides separate functions for statistical and econometric analysis [@seabold2010]. `fbprophet` is a package developed by Facebook researchers which provides forecasting analysis tools, discussed in the later section [@taylor2017].
+
+```{python}
+import numpy as np  # numerical operations
+import matplotlib.pyplot as plt  # visualisations
+import seaborn as sns  # more vis
+import pandas as pd  # for working with dataframes
+import statsmodels.api as sm  # stats functions
+
+from datetime import date, datetime  # working with datetime types
+from scipy.stats import skew  # for reporting skew
+from typing import Dict  # type checking
+
+
+plt.style.use('gadfly')
+```
+
+## Store data
+
+First `store.csv` was read in, containing information regarding the stores in this analysis. The final two columns in `store.csv` were empty and unlabelled so were removed. The `store.csv` file provides variables regarding the 1,115 individual stores considered in this analysis. Table \@ref(tab:storeinfo) gives an overview of the information provided regarding this store level information.
+
+```{r storeinfo, echo=FALSE}
+columns <- c(
+    "Store",
+    "StoreType",
+    "Assortment",
+    "CompetitionDistance",
+    "CompetitionOpenSinceMonth",
+    "CompetitonOpenSinceYear",
+    "Promo2",
+    "Promo2SinceWeek",
+    "Promo2SinceYear",
+    "PromoInterval"
+)
+
+desc <- c(
+    "the anonymised store number",
+    "4 different store models: a, b, c, d",
+    "an assortment level: a = basic, b = extra, c = extended",
+    "distance in meters to the nearest competitor store",
+    "the approximate month of the time when the nearest competitor was opened",
+    "the approximate year of the time when the nearest competitor was opened",
+    "a continuing and consecutive promotion",
+    "the calendar week when the store started participating in Promo2",
+    "the year when the store started participating in Promo2",
+    "consecutive intervals in which Promo2 is restarted, naming the months"
+)
+
+store_desc <- data.frame("Column" = columns, "Description" = desc)
+store_desc %>%
+    kable(caption = "Descriptive information regarding the store level variables.")
+```
+
+The `CompetitionOpenSinceYear` and `CompetitionOpenSinceMonth` variables were combined, making the assumption that all stores opened on the first day of the month, and converted into a single variable with the `datetime` type called `CompetitionDate`. This made working with the data as a timeseries easier. Similarly, the `Promo2Start` variable was created from the `Promo2SinceYear` and `Promo2SinceWeek` variables, using a week is decidedly more complex, particularly as the number of weeks in a year is 52.1775, meaning the number of weeks in a year are either considered to be 52, or 53. The [International Standards Organisation](https://www.iso.org) (ISO) provides the ISO week date system as part of the ISO 8601 datetime standard [@iso2019], which since `pandas` 3.8 is accessible through the `fromisocalendar` method. This method may be applied to every non `NULL` row in the dataframe to convert the week and year provided into a `datetime` variable type, with the assumption that the promotion started on the first day of the week (Monday). As `Promo2` runs for 3 months, indicated by the data documentation, and repeats every 3 months (`PromoInterval` variable), it can be assumed that once `Promo2` has been initiated, it will always be running. Additionally, the store `Assortment` type was converted from categorical to dummy variables.
+
+
+
+```{python}
+# read in store data, final two columns are untitled and blank
+# low memory False excludes errors about multiple types in cols
+store = pd.read_csv("~/data/modules/envs801/DA1920_store.csv",
+                    low_memory=False).iloc[:, :-2]
+
+# create competition start date as datetime
+store['CompetitionDate'] = pd.to_datetime(
+    {'year': store['CompetitionOpenSinceYear'],
+     'month': store['CompetitionOpenSinceMonth'],
+     'day': 1}
+)
+
+
+def week_year_to_datetime(row: pd.Series) -> pd.Series:
+    """Convert year and week column to date"""
+    return np.datetime64(
+        date.fromisocalendar(int(row['Promo2SinceYear']),
+                             int(row['Promo2SinceWeek']), 1)
+    )
+
+
+# ensure NA values don't cause error when converting
+# year and week to dates
+store['Promo2Start'] = store.apply(
+    lambda row: week_year_to_datetime(row)
+    if row[['Promo2SinceYear',
+            'Promo2SinceWeek']].notnull().all() else None, axis=1
+)
+
+# convert assortment from categorical to dummy variables
+store = pd.get_dummies(store, columns=['Assortment'], drop_first=True)
+```
+
+```{python, echo=FALSE}
+dist_skew = skew(store['CompetitionDistance'].dropna())
+```
+
+The `CompetitionDistance` variable was highly skewed (Skew: `r py$dist_skew`), so the log of the distance was taken, which provided a better distribution, commonly suggested for skewed variables [@ah2006]. The distribution is shown on the Figure \@ref(fig:dist), which also indicates the 50\% quantiles.
+
+```{python}
+store['log_competition_dist'] = np.log1p(store['CompetitionDistance'])
+
+fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(14, 8))
+
+store['CompetitionDistance'].hist(bins=20, edgecolor='k', ax=axes[0])
+axes[0].axvline(store['CompetitionDistance'].quantile(),
+                color='k', linestyle='dashed')
+axes[0].set_xlabel('Competition Distance (m)')
+
+store['log_competition_dist'].hist(bins=20, edgecolor='k', ax=axes[1])
+axes[1].axvline(store['log_competition_dist'].quantile(),
+                color='k', linestyle='dashed')
+axes[1].set_xlabel('Log Competition Distance')
+plt.show()
+```
+```{r dist, fig.cap='Distribution of the competition distance in meters, and the log of the competition distance. Black dotted vertical line indicates the 50% quantiles', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+All unused variables were now dropped, leaving the final store level variables given below.
+
+```{python}
+store.drop(['PromoInterval',
+            'CompetitionOpenSinceMonth',
+            'CompetitionOpenSinceYear',
+            'Promo2SinceWeek',
+            'Promo2SinceYear',
+            'CompetitionDistance'], axis=1, inplace=True)
+```
+```{python}
+print(store.columns)
+```
+
+Only the `CompetitionDate`, `Promo2Start`, and `log_competition_dist` columns now contain null values. This makes sense, and is expected in cases where stores have never had nearby competition, or have never activated Promo 2.
+
+## Test and training data
+
+Following the store data cleaning, the training and testing data was read in. When reading in the CSVs, the `Date` columns were parsed as the `datetime` type. These dataframes could be easily matched to `store.csv` based on the `Store` variable to which contains unique numerical IDs for each store in the data. The data was limited to the date ranges specified in the overview, to ensure no rogue data was included. During exploratory analysis it was noted that it appeared for some test dates they were using the American date system, these were converted to the ISO date standard and re-included into the dataset.
+
+```{python}
+train = pd.read_csv("~/data/modules/envs801/DA1920_train.csv",
+                    low_memory=False,
+                    parse_dates=['Date']
+                    )
+train = train[(train['Date'] >= '2013-01-01') &
+              (train['Date'] <= '2015-07-31')]
+train = train.merge(store, on='Store')
+
+test = pd.read_csv("~/data/modules/envs801/DA1920_test.csv",
+                   low_memory=False,
+                   parse_dates=['Date'])
+
+# some dates are for some reason American formatted
+test_wrong_dates = test[(test['Date'] < '2015-08-01') |
+                        (test['Date'] > '2015-09-17')]
+
+# convert from US to ISO dates
+fixed_dates = test_wrong_dates['Date']\
+                    .apply(lambda x: datetime.strftime(x, '%Y-%d-%m'))
+test_wrong_dates['Date'] = fixed_dates.values
+
+# convert back to datetime
+test_wrong_dates['Date'] = pd.to_datetime(test_wrong_dates['Date'])
+
+# add fixed dates to known correct dates
+test = test.append(test_wrong_dates)
+
+# ensure dates are within specified range
+test = test[(test['Date'] >= '2015-08-01') &
+            (test['Date'] <= '2015-09-17')]
+test = test.merge(store, on='Store')
+```
+
+Table \@ref(tab:datainfo) gives an overview of the variables provided with both the test and training data. While the test data contains all variables, both the sales and customer columns contain only NA values. The training dataset contains 
+`r format(nrow(py$train), big.mark=',')` 
+rows, and testing dataset contains 
+`r format(nrow(py$test), big.mark=',')` 
+rows. 
+
+```{r datainfo, echo=FALSE}
+columns <- c(
+    "Store",
+    "DayOfWeek",
+    "Date",
+    "Sales",
+    "Customers",
+    "Open",
+    "Promo",
+    "StateHoliday",
+    "SchoolHoliday"
+)
+
+desc <- c(
+    "the anonymised store number",
+    "the day of the week 1 = Monday etc.",
+    "the given date",
+    "the turnover on a given day",
+    "the number of customers on a given day",
+    "an indicator for whether a store is open",
+    "whether a store is running a promotion that day",
+    "state holidays, including public, easter, Christmas",
+    "days where public schools are closed"
+)
+
+data_desc <- data.frame("Column" = columns, "Description" = desc)
+data_desc %>%
+    kable(caption = "Descriptive information regarding the timeseries data.")
+```
+
+ Using the newly created `CompetitionDate` variable, a store could be determined as having active competition at the date the data was recorded. `CompetitionDistance` was then converted into a binary variable, `NearbyCompetition`, considering any _open_ competition nearer than the 50% quantile of all distances to be nearby. This is given by the `competition_fix` function.
+
+```{python}
+def competition_fix(df: pd.DataFrame) -> pd.DataFrame:
+    """Consider nearby competition that is open
+
+    Creates a binary variable to determine whether competition
+    is open given the observation date. Selects competitions
+    that are both open and within 50th quantile as 1, 0 otherwise.
+
+    Args:
+        df (pd.DataFrame): Test or Train dataset in this report
+    """
+    # Only show competition if open by date of sale
+    df['Competition'] = np.where(df['CompetitionDate'] <
+                                 df['Date'], 1, 0)
+    # nearby competition if open and less than 50% quantile
+    df['NearbyCompetition'] = np.where(
+        (df['log_competition_dist'] > df['log_competition_dist'].quantile()) &
+        (df['Competition'] == 1),
+        1, 0
+    )
+    return df
+
+
+train = competition_fix(train)
+test = competition_fix(test)
+```
+
+The `average_spend` variable was created by dividing the number of sales by the number of customers. Interestingly for store type **b**, the daily sales were highest, but customers spent by far the least on average. This is given on Table \@ref(tab:avg).
+
+```{python}
+# new av spend variable
+train['average_spend'] = train['Sales'] / train['Customers']
+
+vals = {}
+for storetype in train['StoreType'].unique():
+    r = train[train['StoreType'] == storetype]
+    vals[storetype] = r[['Sales', 'Customers', 'average_spend']].mean()
+
+avg_tab = pd.DataFrame(vals).transpose()
+```
+
+```{r avg, echo=FALSE}
+py$avg_tab %>% kable(caption = "Average number of sales, customers and average spend by store type.")
+```
+
+Whether Promotion 2 was active in a particular store at the date was derived and given a binary value, given by the `promo_fix` function, holidays were also converted to binary variables. Finally, all now unneeded columns were dropped from both the test and training data.
+
+```{python}
+def promo_fix(df: pd.DataFrame) -> pd.DataFrame:
+    # promo2 active if since week and year
+    df['Promo2Precise'] = np.where(
+        df['Promo2Start'] <= df['Date'], 1, 0
+    )
+    return df
+
+
+train = promo_fix(train)
+test = promo_fix(test)
+
+
+def convert_holidays(df: pd.DataFrame) -> pd.DataFrame:
+    df['StateHoliday'] = np.where(df['StateHoliday'] == '0', 0, 1)
+    return df
+
+
+train = convert_holidays(train)
+test = convert_holidays(test)
+
+
+def drop_cols(df: pd.DataFrame) -> pd.DataFrame:
+    df.drop(['log_competition_dist',
+             'Promo2',
+             'CompetitionDate',
+             'Promo2Start',
+             'Competition'], axis=1, inplace=True)
+    return df
+
+
+train = drop_cols(train)
+test = drop_cols(test)
+```
+
+[ONS GDP](https://www.ons.govuk/economy/grossdomesticproductgdp) data was integrated, and used as a proxy considering the increase in spending power across the national population. This data is provided by yearly quarters, so to combine with the existing sales data this had to first be converted to the `datetime` type.
+
+```{python}
+ons_gdp = pd.read_csv("~/data/modules/envs801/series-100620.csv", skiprows=8,
+                      header=None)
+ons_gdp = ons_gdp[ons_gdp[0].str.contains('^2013\s', regex=True) |
+                  ons_gdp[0].str.contains('^2014\s', regex=True) |
+                  ons_gdp[0].str.contains('^2015\s', regex=True)]
+ons_gdp[0] = pd.to_datetime(ons_gdp[0].str.replace(' ', ''))
+ons_gdp.rename(columns={0: 'Date', 1: 'gdp'}, inplace=True)
+
+
+def merge_ons(df, ons):
+    df = df.sort_values('Date')
+    df = df.merge(ons, on='Date', how='left')\
+            .fillna(method='ffill')
+    return df
+
+
+train = merge_ons(train, ons_gdp)
+
+# test data uses Q4 2015 for gdp
+test['gdp'] = ons_gdp.iloc[-1, 1]
+```
+
+## Stationarity of TimeSeries
+
+Timeseries data is likely to suffer from seasonality. Figure \@ref(fig:weekly) shows the weekly seasonality of the data. It is clear that for stores excluding type **b** there is a drop in Sunday sales, this is likely due to Sunday trading laws.
+
+```{python}
+def group_dates(df: pd.DataFrame, time_period: str) -> pd.DataFrame:
+    df.groupby([time_period, 'StoreType'],
+               as_index=False)['Sales'].mean()
+    return df
+
+
+weekly_train = group_dates(train, 'DayOfWeek')
+
+train['Month'] = train['Date'].dt.month
+monthly_train = group_dates(train, 'Month')
+
+sns.catplot(data=weekly_train, x='DayOfWeek', y='Sales',
+            col='StoreType', kind='point', hue='StoreType')
+plt.show()
+```
+```{r weekly, fig.cap='Weekly seasonality by store type.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+Figure \@ref(fig:monthly) gives the monthly seasonality for each store type, as is expected, sales tend to peak towards the end of the year, this is common across all stores, and a common observation in sales data [@hylleberg1992].
+
+```{python}
+sns.catplot(data=monthly_train, x='Month', y='Sales',
+            col='StoreType', kind='point', hue='StoreType')
+plt.show()
+```
+```{r monthly, fig.cap='Monthly seasonality by store type.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+## Accounting for Trend and Seasonality
+
+The overall trend of the sales per store type is visualised below. There is a clear overall increasing trend, which is particularly noticeable for the **b** store types.
+
+```{python}
+# visualise overall trend between store types
+train.set_index('Date', inplace=True)
+
+
+def resample_by_col(df: pd.DataFrame, col: pd.Series, rule: str) -> Dict:
+    """Allow resampling to different time granularity
+
+    This may be used to resample to months or weeks for example. Providing
+    the ability to choose multiple columns to aggregate the mean data by.
+    For example store types, and store assortments.
+    """
+    return {x: df[df[col] == x]
+            .resample(rule=rule)['Sales'].mean()
+            for x in df[col].unique()}
+
+
+# resample data to month by storetypes
+resampled_storetype = resample_by_col(train, 'StoreType', '1M')
+fig, ax = plt.subplots(figsize=(14, 14))
+for key, storetype in resampled_storetype.items():
+    ax.plot(storetype, label=key)
+    ax.legend()
+plt.show()
+```
+```{r trend, fig.cap='Overall trend of sales by store type, grouped by mean number of sales per month.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+
+The `statsmodels` python library provides the `seasonal_decompose` function which extracts seasonal and trend values for timeseries data. Essentially these capture the fluctuations in sales that happen yearly, e.g. increased sales towards the end of the year, and the overall increasing trend of the sales, as shown on Figure \@ref(fig:trend). These values attempt to account for these changes over time, and as such provide additional variables which may be considered in a linear model. It should be considered that from the [documentation](https://www.statsmodels.org/dev/generated/statsmodels.tsa.seasonal.seasonal_decompose.html) for this function, it is noted that this method uses a naive decomposition, and more sophisticated methods should be preferred.
+
+The `create_trends` function captures this seasonality and trend by store type, which is essential due to the disparity between **b** stores and others, as shown on Figures \@ref(fig:trend), \@ref(fig:weekly), and \@ref(fig:monthly).
+
+```{python}
+def create_trends(df: pd.DataFrame, type: str) -> Dict:
+    """Obtain statsmodel trends values by storetype
+    
+    Choose either seasonal or trend from statsmodel, convert to dict
+    of storetypes and trend values. Dict then converted to pandas dataframe.
+    """
+    if type == 'seasonal':
+        trend = {keys: sm.tsa.seasonal_decompose(storetype).seasonal
+                 for keys, storetype in df.items()}
+    elif type == 'trend':
+        trend = {keys: sm.tsa.seasonal_decompose(storetype).trend
+                 for keys, storetype in df.items()}
+    trend = pd.melt(
+        pd.DataFrame(trend).reset_index(),
+        id_vars='Date',
+        value_name=type,
+        var_name='StoreType'
+    )
+    return trend
+
+
+seasonal_trend = create_trends(resampled_storetype, type='seasonal')
+time_trend = create_trends(resampled_storetype, type='trend')
+
+# ffill will fill in gaps from start of month to end by store type
+train = train.merge(seasonal_trend, on=['Date', 'StoreType'], how='left')\
+    .fillna(method='ffill')
+
+# must also backwards fill this data
+train = train.merge(time_trend, on=['Date', 'StoreType'], how='left')\
+    .fillna(method='ffill')\
+    .fillna(method='bfill')
+```
+
+With all the variables now created, a heat map can now be used to determine the correlation between each, shown on Figure \@ref(fig:corr). Key observations are that Promo gives higher sales, state holidays mean lower sales, and there appears to be a slight drop in sales with Promo2. Interestingly, average spend is negatively correlated with the time trend, suggesting that customers are spending less on average, despite customers being correlated positively with time. Again here the Sunday trading laws are reflected by the reduction in sales for later days in the week (higher values). The extracted trend variable also indicates a strong correlation with the Assortment b type, suggesting that in addition to the categorical store types, the assortment type should be considered as well. The GDP data shows a clear correlation with the trend, implying that sales trends do closely follow GDP.
+
+```{python}
+fig, ax = plt.subplots(figsize=(14, 14))
+corr = train.drop(['Open', 'Store'], axis=1).corr()
+ax = sns.heatmap(
+    corr,
+    vmin=-1, vmax=1, center=0,
+    cmap=sns.diverging_palette(20, 220, n=200),
+    square=True,
+    annot=True
+)
+ax.set_xticklabels(
+    ax.get_xticklabels(),
+    rotation=45,
+    horizontalalignment='right'
+)
+plt.show()
+```
+```{r corr, fig.cap='Correlation of all variables in relation to each other for the final cleaned data.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+This cleaned data was then saved to new CSVs.
+
+```{python}
+train.to_csv('~/data/modules/envs801/derived/train_clean.csv')
+test.to_csv('~/data/modules/envs801/derived/test_clean.csv')
+```
+
+# Timeseries Analysis 
+
+This analysis uses the [Facebook Prophet library ](https://facebook.github.io/prophet/) for forecasting [@taylor2017]. Prophet uses an additive model for considering non linear trends in yearly, weekly, and daily seasonality. Prophet also includes the ability to consider holiday effects, shifts in the trends, outliers and missing data. While the above data preprocessing demonstrates the ability to capture trends and seasonality, it is not necessary to use this information with Prophet, as these are derived automatically, and with more complex and accurate methods. This also means that when predicting future values, trend and seasonality may be considered even when unknown, in addition to the variables provided in the testing data.
+
+First the libraries were loaded in along with the cleaned training and test data.
+
+```{python}
+from fbprophet.plot import plot_cross_validation_metric
+from fbprophet.diagnostics import performance_metrics, cross_validation
+from fbprophet import Prophet
+from typing import Tuple
+
+train = pd.read_csv('~/data/modules/envs801/derived/train_clean.csv',
+                    index_col=0)
+test = pd.read_csv('~/data/modules/envs801/derived/test_clean.csv',
+                   index_col=0)
+```
+
+For this analysis it was determined that it would be simpler to keep only stores which were open, as sales were of interest and any store closed should have no sales. Any day where a large number of stores were closed e.g. holidays, will be reflected in a lower number of total sales. Due to the clear differences between store types, it was appropriate that the analysis should be split. The following section explores the prediction of the future number of sales for the **b** type of stores only, taking the total number of sales per day across all **b** stores.
+
+```{python}
+# keep only open stores
+# sales will reflect closed stores
+train = train[train['Open'] == 1]
+test = test[test['Open'] == 1]
+
+
+def groupby_storetype(df: pd.DataFrame, store_type: str) -> pd.DataFrame:
+    """Keep columns present in testing data, group by storetype"""
+    gdp = df[df['StoreType'] == store_type]\
+            .loc[:, ['Date', 'gdp']]\
+            .groupby(['Date'], as_index=False).mean()
+    df = df[df['StoreType'] == store_type]\
+        .loc[:, ['Date',
+                 'Sales',
+                 'Promo',
+                 'Promo2Precise',
+                 'Assortment_b',
+                 'Assortment_c',
+                 'NearbyCompetition'
+                 ]]\
+        .groupby(['Date'], as_index=False).sum()
+    df['Date'] = pd.DatetimeIndex(df['Date'])
+    df['gdp'] = gdp['gdp']
+    df.rename(columns={'Date': 'ds',
+                       'Sales': 'y'}, inplace=True)
+    return df
+
+sales = groupby_storetype(train, store_type='b')
+test = groupby_storetype(test, store_type='b').drop('y', axis=1)
+```
+
+The total daily sales for the **b** stores are given below.
+
+```{python}
+# plot daily sales
+ax = sales.set_index('ds')['y'].plot(figsize=(14, 4))
+ax.set_ylabel('Daily Number of Sales')
+ax.set_xlabel('Date')
+plt.show()
+```
+```{r sales, fig.cap='Total number of sales per day over the timeseries for the **b** store types.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+Prophet takes the holidays into account, so these were separated into their own dataframe.
+
+```{python}
+state_dates = train[(train['StateHoliday'] == 1)]['Date'].values
+school_dates = train[train['SchoolHoliday'] == 1]['Date'].values
+
+state = pd.DataFrame({'holiday': 'state_holiday',
+                      'ds': pd.to_datetime(state_dates)})
+school = pd.DataFrame({'holiday': 'school_holiday',
+                       'ds': pd.to_datetime(school_dates)})
+
+holidays = pd.concat((state, school))
+```
+
+The model could now be built, the function below provides options for the inclusion of all additional regressions, and whether to run predictive analysis on the test data. This function outputs the model itself, the predicted values, and the Root Mean Square Percentage Error (RMSPE).
+
+```{python}
+def create_model(
+        df: pd.DataFrame,
+        include_regressors: bool,
+        holidays: pd.DataFrame,
+        test_data: pd.DataFrame = None) -> Tuple[Prophet, pd.DataFrame, float]:
+    """Fit Prophet models with adjustable params
+
+    Allows for inclusion of test data, holidays, and regressors 
+    in Prophet model. Function will fit the model to output the model, 
+    forecasted values, optionally including future dates, and the global
+    root mean square error.
+
+    Args:
+        df (pd.DataFrame): Containing y output var, optionally regressors
+        include_regressors (bool): Optionally include all regressors
+        holidays (pd.DataFrame): Contains dates for all holidays
+        test_data (pd.DataFrame, optional): future dates, optional regressors
+
+    Returns:
+        Tuple[Prophet, pd.DataFrame, int]: Model, forecast values and RMSPE.
+    """
+    model = Prophet(holidays=holidays,
+                    daily_seasonality=False)
+
+    if include_regressors:
+        for col in df.columns[2:]:
+            model.add_regressor(col)
+
+    model.fit(df)
+
+    if test_data is not None:
+        forecast = model.predict(df.append(test_data))
+    else:
+        forecast = model.predict(df)
+
+    fc = forecast.merge(df[['ds', 'y']], on='ds', how='left')
+    fc_drop = fc.dropna()
+    # values lower than zero = 1 for rmse calcs
+    fc_drop['yhat'] = np.where(fc_drop['yhat'].values <= 0, 1, fc_drop['yhat'].values)
+    fc_drop['y'] = np.where(fc_drop['y'].values <= 0, 1, fc_drop['y'].values)
+
+    def find_rmspe(y_true: pd.Series, y_pred: pd.Series) -> float:
+        return np.sqrt(
+            np.mean(np.square(((y_true - y_pred) / y_true)), axis=0)
+        ) * 100
+
+    rmspe = find_rmspe(fc_drop['y'], fc_drop['yhat'])
+    return model, fc, rmspe
+```
+
+Two initial models were ran, one with regressors, and one without inclusion of regressors. Table \@ref(tab:rmspe)  shows that the inclusion of regressors gave a small improvement in the RMSPE so this model will be used for the final analysis.
+
+As the predictions were made using the total collectives sales of all **b** stores, the regressors included provided the sum of all stores with that particular feature. These regressors include `Promo`, the sum of all stores running the first promotion on a particular date, `Promo2Precise`, the sum of all stores running the second promotion, and `NearbyCompetition`, the sum of all nearby competition. Also included are `Assortment_b`, and `Assortment_c`, as the sum of all stores that operate with their respective assortment. In this case, variations in the numbers reflect the closure of particular stores on given days, allowing for the number of open stores of particular assortment types to be indicative of fluctuations in sales. Assortment a stores are indicated when assortment b and c took values lower than the total number of stores. The quarterly GDP provided by ONS is self explanatory, and purely provides the national GDP at that date, as a proxy that may represent national trends in overall sales.
+
+These regressors represent the maximum amount of additional information that may be provided to the model on a day to day basis using the chosen method.
+
+
+```{python}
+model1, fc1, rmspe1 = create_model(sales,
+                                   include_regressors=True,
+                                   holidays=holidays)
+model2, fc2, rmspe2 = create_model(sales,
+                                   include_regressors=False,
+                                   holidays=holidays)
+
+cols = ['Model 1 (Inc. Regressors)', 'Model 2 (Exc. Regressors)']
+
+rmspe_tab = pd.DataFrame({'Model': ['Model 1 (Inc. Regressors)',
+                                    'Model 2 (Exc. Regressors)'],
+                          'RMSPE': [rmspe1, rmspe2]})
+```
+
+```{r rmspe, echo=FALSE}
+py$rmspe_tab %>% kable(caption = "Root Mean Squared Percentage Errors (RMSPE) for Model 1 and Model 2")
+```
+
+The more effective model was then used to predict values from the test data. The result of this is given visually on **Figure \@ref(fig:model)**, the values following the dotted line indicate the new sale predictions.
+
+```{python}
+# model including test data
+model, fc, rmspe = create_model(sales,
+                                include_regressors=True,
+                                holidays=holidays,
+                                test_data=test)
+
+fig, ax = plt.subplots(figsize=(16, 8))
+model.plot(fc, ax=ax)
+plt.axvline(x=test['ds'].iloc[0], color='k', linestyle='dashed')
+plt.show()
+```
+```{r model, fig.cap='Prophet model predicted values for existing data and future predicted data. Dark blue line shows estimated values, lighter blue upper and lower estimates. Black dots are true data points, and black vertical dashed line shows cutoff between real data and predicted.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+In order to test the robustness of the model, Prophet provides some cross-validation functions. Table \@ref(tab:perf) gives an overview of the results produced by this metric, with errors for different horizons. Each horizon is the number of days following the cutoff from the data used to make the prediction. Table \@ref(tab:perf) interestingly shows that despite larger horizons, the model appears to stay robust.
+
+```{python}
+# prophet crossvals
+df_cv = cross_validation(model1, horizon='180 days')
+df_p = performance_metrics(df_cv)
+performance = df_p.head(3).append(df_p.tail(3))
+performance['horizon'] = performance['horizon'].dt.days.astype(str)
+```
+
+```{r perf, echo=FALSE}
+py$performance %>% kable(caption = "Performance metrics for different horizons for the Prophet forecasting model. Horizon indicates the number of days used to make the prediction.")
+```
+
+Figure \@ref(fig:cross) visualises the results of this cross validation, showing a fairly consistent 10\% Mean Absolute Percentage Error (MAPE), for each horizon. There are several large outliers present, these could be reflective of days where large stores are closed for refurbishment, as indicated in the brief.
+
+```{python}
+plot_cross_validation_metric(df_cv, metric='mape')
+plt.show()
+```
+```{r cross, fig.cap='Mean Absolute Percentage Error (MAPE) for cross validation across multiple horizon windows.', echo=FALSE, out.height="1px"}
+plot.new() # allow caption on python plot
+```
+
+# Conclusion
+
+It is essential to understand the data being considered prior to running any analytical task. While the data used in this report concerns stores operated by the same pharmaceutical company, there are significant differences in the way individual stores are operated. The analyses identifies key differences in the trading of **b** stores compared with **a**, **c**, and **d** stores, as the **b** stores are permitted to remain open on Sundays. Key differences between these store types are also reflected by the much larger average number of customers for **b** stores, but with lower average sales per customer. It is clear that **b** stores represent a much smaller number of stores for this company, but due to their large size, account for a significant proportion of overall sales. This report chose to focus particularly on the analysis of **b** store due to their increasing sales trend over time, indicating that it is likely the focus on these stores provides the most financial incentive.
+
+While this report explores the use of additional regressors in the forecasting analysis, it is apparent that these provide only a slight improvement to the baseline model. This highlights the widely accepted importance of considering seasonal trends in forecasting analysis [@holt2004;@hylleberg1992], something which is hard to capture in traditional regression.
+
+<hr>
+Word count: `r wordcountaddin::word_count(rprojroot::thisfile())`
+<hr>
+
+#### References {-}
+

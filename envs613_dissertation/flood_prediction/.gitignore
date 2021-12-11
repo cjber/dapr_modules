@@ -1,0 +1,9 @@
+cpkt/
+data/
+experiments/
+typings/
+
+.env
+.venv/
+
+

@@ -1,0 +1,88 @@
+---
+output:
+  pdf_document:
+    keep_tex: false
+    fig_caption: yes
+    latex_engine: xelatex
+    template: ./template/template.tex
+geometry: margin=1in
+header-includes:
+   - \linespread{1.05}
+
+title: "Text Classification using Binary Perceptron Algorithm"
+author: 201374125
+
+fontsize: 11pt
+---
+
+## **Explain the Perceptron algorithm for the binary classification case, providing its pseudo code.**
+
+The **perceptron** algorithm is a supervised learning technique for binary classifiers. The algorithm maps a vector $\mathbf{x}$ to an output value $f(\mathbf{x})$ (a single value), under the conditions:
+
+$$
+f(\mathbf{x})=\left\{\begin{array}{ll}
+\phantom{-} 1 & \text { if } \mathbf{w} \cdot \mathbf{x}+b>0 \\
+-1 & \text { otherwise }
+\end{array}\right.
+$$
+
+where $\mathbf{w}$ is a vector of weights, and $\mathit{b}$ is the bias term.
+
+For a binary classification case with a training vector $\mathbf{x}$ with two input vectors $\mathbf{x_1,x_2}$ with labels $\mathit{y_i} \in \{-1, 1\}$, first the weight vector would be initialised with weights, one for each input, each taking a value of zero; $w_d(w_1=w_2=0)$. Bias is also initialised as zero; $(b=0)$.
+
+The activation function may be computed which takes the dot product of the vectors $w=[w_0,w_1]$ and $x=[x_0,x_1]$, plus the bias;
+
+$$
+a=\sum_{i=0}^{D} w_{d} x_{d}+b
+$$
+
+If the output of $ya < 0$ then the function will update. As all weights were first computed as zero, the result of $w_1 x_1 + w_2 x_2 + b = 0$. This means that $a=0$ and $ya=0$ so the weight vector and bias must be updated. The weight vector is updated by adding the label $y_i$ multiplied by the associated input vector $x_d$ to the origin input vector value, represented; $w_{d} \leftarrow w_{d}+y x_{d}$, these updated training weights are then used to retrieve the next value of $ya$ until $ya > 0$.
+
+
+\begin{algorithm}
+\setstretch{1.15}
+\caption{\textsc{PerceptronTrain}(\textbf{D}, \textit{MaxIter})}\label{perceptron}
+\begin{algorithmic}[1]
+\State $w_{d} \leftarrow o, \text { for all } d=1 \ldots D$
+\State $b \leftarrow o$
+\For {$\mathit{iter} = 1\dots \mathit{MaxIter}$}
+\ForAll {$(x,y) \in \mathbf{D}$}
+\State $a \leftarrow \sum_{d=1}^{D} w_{d} x_{d}+b$
+\If {$ya \leq 0$}
+\State $w_{d} \leftarrow w_{d}+y x_{d}, \text { for all } d=1 \ldots D$
+\State $b \leftarrow b+y$
+\EndIf
+\EndFor
+\EndFor
+\Return $w_{0}, w_{1}, \ldots, w_{D}, b$
+\end{algorithmic}
+\end{algorithm}
+
+\begin{algorithm}
+\setstretch{1.15}
+\caption{\textsc{PerceptronTest}($\left(w_{0}, w_{1}, \dots, w_{D}, b, \hat{x}\right)$}\label{perceptrontest}
+\begin{algorithmic}[1]
+\State a $\leftarrow \sum_{d=1}^{D} w_{d} \hat{x}_{d}+b$
+\Return $\textsc{sign}(a)$
+\end{algorithmic}
+\end{algorithm}
+
+
+## **Prove that for a linearly separable dataset the perceptron algorithm will converge.**
+
+For each data point $x$, for $\|\mathbf{x}\|<R$ where $R$ is a constant number, $\gamma=\left(\theta^{*}\right)^{T} \mathbf{x}_{\mathbf{c}}$, where $\mathbf{x}_c$ is a point closest to the linear separate hyperplane. Mathematically $\frac{\gamma}{\left\|\theta^{*}\right\|^{2}}$ is the distance $d$ of the closest data point to the linear separate hyperplane, and the number of steps is bounded by $\frac{R^{2}}{d^{2}}$, i.e. a finite number of steps.
+
+In written terms, each time the perceptron makes a mistake, the weight vector will move to decrease the squared distance from every vector in the generously feasible region. The squared distance decreases by at least the squared length of the input vector, and so after a number of mistakes, the weight vector will like in the feasible region, if it exists.
+
+## **Implement a binary perceptron**
+
+Implemented in python code:
+
+```{r, echo=F, cache=FALSE}
+knitr::read_chunk('perceptron.py', labels = 'perceptron')
+```
+
+```{r perceptron, engine='python', eval=FALSE, cache=FALSE}
+
+```
+

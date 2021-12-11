@@ -1,0 +1,173 @@
+---
+output:
+  pdf_document:
+    keep_tex: true
+    fig_caption: yes
+    latex_engine: xelatex
+    template: ./template/template.tex
+geometry: margin=1in
+header-includes:
+   - \linespread{1.05}
+
+title: "Building a Graph Database of Place Descriptions"
+author: 201374125
+fontsize: 10pt
+bibliography: 
+    - /home/cjber/drive/bib/zbib.bib
+csl: /home/cjber/drive/bib/uol_cb.csl
+link-citations: yes
+---
+
+# Introduction
+
+This project aims to provide a structured graph database of location descriptions for use in geographic natural language processing tasks. Using a graph database for the store of this information allows for semantic associations between locations to be inferred based on their proximity within the database. This provides an alternative to the purely coordinate based and euclidean associations between geographic locations, and attempts to capture platial connections, as opposed to purely spatial ones. This considers previous work addressing the development of hierarchical geo-ontologies [@sun2019a], and attempts to describe the hierarchical nature of definable geographic concepts in a computer interpretable way, demonstrated on **Fig. \ref{f:hier}**.
+
+\begin{figure}[H]
+\begin{center}
+\begin{tikzpicture}[level distance=1.5cm,
+  level 1/.style={sibling distance=3cm},
+  level 2/.style={sibling distance=1.5cm}]
+  \node {Country}
+    child {node {Region}}
+    child {node {Region}
+        child {node {County}}
+        child {node {County}
+          child {node {District}}
+          child {node {District}
+              child {node {Postcode}
+                child {node {Location}}}
+      }}
+    };
+\end{tikzpicture}
+\end{center}
+\caption{The hierarchical representation of geographical concepts}\label{f:hier}
+\end{figure}
+
+
+Purely geographic implementations of similar work already exist, for example [Geonames](https://geonames.org), and [OpenStreetMap](https://openstreetmap.org), which both have comprehensive coverage of places for much of the UK. However, these do not provide any descriptive language associated with the geographic locations. [DBpedia](http://dbpedia.org) is an example of a more general knowledge base, and given it is built from data extracted from Wikipedia, it provides descriptions for many of the items contained within it.
+
+Labelled data is often a primary concern when performing many analytical tasks, and is considered a particular issue in geographic natural language processing [@gritta2019;@stock2013]. Much of the existing work has relied on time consuming, manual labelling of data which leads to smaller datasets [@middleton2016;@wallgrun2018;@gey2006], and many which are not made freely available [@leidner2011;@leidner2007;@andogah2010;@weissenbacher2019]. The lack of large, high quality, labelled geographic natural language data is well noted by many authors in this subject area [@tobin2010;@speriosu2013;@weissenbacher2015;@gritta2018;@karimzadeh2019;@weissenbacher2019].
+
+The production of a dataset containing descriptive information, in addition to hierarchical geo-information regarding locations may assist with a variety of geographic natural language tasks. For example, in toponym disambiguation, contextual information provided alongside the identified toponym is often used as a method for correctly resolving to a single toponym [@tobin2010;@roberts2010;@speriosu2013], this may include topics associated with particular toponyms [@speriosu2013;@adams2013;@ju2016], and metadata associated with the toponyms, including geotags [@zhang2014], and other structured information [@weissenbacher2015]. Additionally, this dataset acts as labelled descriptive information regarding a specific, known (geocoded) location, useful for recent developments in fine-grained localisation research [@al-olimat2019;@chen2018a;@chen2018], and point of interest identification [@moncla2014;@li2014].
+
+This project therefore aims to bring forward the most complete corpus of labelled geographic natural language available through automatic extraction of Wikipedia place summaries, providing both contextual information associated with toponyms and hierarchical geo-information.
+
+# Methodology
+
+## DBpedia
+
+[DBpedia](https://wiki.dbpedia.org/) is a crowd sourced collection of information extracted from [Wikimedia](https://commons.wikimedia.org/wiki/Main_Page) projects, presented in a structured format resembling an open knowledge graph (OKG). This provides linked data in a machine-readable format, accessible through a [SPARQL querying API](http://www.dbpedia.org/sparql). The data follows the [Resource Description Framework](https://www.w3.org/RDF/) (RDF) as defined by the World Wide Web Consortium (W3C) specifications, providing an alternative web linking structure. RDF models for data exchange use URIs to name a relationship between things, as well as information regarding the two ends of each link, generally known as a triple.
+
+As of this report, the DBpedia knowledge base describes 4.58 million things, including persons, places, creative works, and organisations. The data is available under the [Creative Commons Attribution-ShareAlike 3.0 Licence](https://creativecommons.org/licenses/by-sa/3.0/) and the [GNU Free Documentation Licence](https://www.gnu.org/licenses/fdl-1.3.en.html) which allows for copying, redistribution and adaptation of the data, including for commercial use.
+
+## Building a SPARQL Query
+
+SPARQL is an RDF query language which allows for the use of namespace prefixes to query URI triples from the DBpedia RDF database. These prefixes include DBpedia defined [ontologies](http://dbpedia.org/ontology/), [resources](http://dbpedia.org/resource/), or [properties](http://dbpedia.org/property/), and additional prefixes, including those defined by the W3C. The DBpedia prefixes are perhaps the most useful, as they provide consistent class definitions for types of thing contained in the database. For example anything given the class `Place` is likely of interest for this research. This class `Place` then provides various subclasses which may be used to perform specific queries, `Architectural Structure` and Celestial `Body` are examples of `Place` subclasses. These subclasses also provide their own subclasses, e.g. `Building`, `Pyramid.`
+
+However, from inspection of specific URIs for places within the United Kingdom, it appears that these RDF links are often incomplete, or provide mismatched information. It is rare for a place that is not classified as a `Building` to have `Building` level class granularity, and many places in the UK only contain the `Place` class. Additionally, the `Country` relation for many places returns primarily the _United Kingdom_, but includes counties e.g. _Dorset_, and occasionally returns _England_, but never _Scotland_ or _Wales_. The same is true with `District`, which occasionally returns cities e.g. _Burthwaite_ returns _City of Carlisle_. Some naming is inconsistent e.g. _Lewes (district)_ vs _Scarborough (borough)_ and _South Lakeland_ are all labels given to `Place` in the United Kingdom, chiefly when place names are not unique they contain additional information in parentheses. Therefore, it is unlikely that comprehensive coverage may be achieved if attempting to query places using their more granular classes. It is also important for the inclusion of all places that, instead of just querying using the _United Kingdom_, the query includes the constituent countries. Coordinate information is also present for many, but not all, DBpedia places.
+
+Considering the limitations of the database in relation to the United Kingdom, a query was built to obtain English Wikipedia abstracts for each `Place` in any country within Great Britain, using the [DBpedia SPARQL endpoint](http://dbpedia.org/sparql). Given the above constraints, no further information was extracted. This query is given below:
+
+\vspace{2mm}
+```{sql, eval=F}
+    PREFIX dbo: <http://dbpedia.org/ontology/>
+    PREFIX res: <http://dbpedia.org/resource/>
+    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+
+    SELECT DISTINCT ?lab ?abs
+    WHERE {
+            { ?uri dbo:country res:England } UNION
+            { ?uri dbo:country res:United_Kingdom } UNION
+            { ?uri dbo:country res:Scotland } UNION
+            { ?uri dbo:country res:Wales } UNION
+            { ?uri dbo:location res:England } UNION
+            { ?uri dbo:location res:United_Kingdom } UNION
+            { ?uri dbo:location res:Scotland } UNION
+            { ?uri dbo:location res:Wales } .
+
+            { ?uri rdf:type dbo:Place } UNION
+            { ?uri rdf:type dbo:Organisation } .
+
+              ?uri rdfs:lab ?lab . FILTER (lang(?lab) = 'en')
+              ?uri dbo:abstract ?abs . FILTER (lang(?abs) = 'en')
+    } LIMIT 10000
+```
+
+To overcome the 10,000 query limit, the query was looped over several times with a 10,000 query offset to obtain a full set of results.
+
+## Including Metadata
+
+To obtain the further geographic information required for building the hierarchical links between the extracted locations, the [Ordnance Survey Linked Data](https://data.ordnancesurvey.co.uk/datasets/os-linked-data) was considered as it was accessible through a SPARQL endpoint. However, the data itself did not contain the hierarchical links required, and given such a large amount of data was being extracted, it was not an efficient way to gather the data. Alternatively, Ordnance Survey provides access to two core datasets through the Edina Digimap service under the [Educational User Licence](https://digimap.edina.ac.uk/webhelp/os/copyright/digimap_os_eula.pdf), allowing for free unlimited access of the data for *Educational Use*. However, as this project is undertaken in collaboration with Ordnance Survey, it is likely that the licence will be more flexible.
+
+The two datasets accessed through Digimap were Ordnance Survey Points of Interest (POI), and OS Open Names. The POI data contains various information regarding certain locations in the United Kingdom classified as POI. A POI is generally defined as a location that a person may find useful or interesting. In the case of this data, POI include locations such as _All Saints Church Hall_, the word _Church_, or the names of shops e.g. _The Co-operative_. While much of this data does not provide useful locational information for this project, for any unique named location it may provide additional meta information. The POI dataset was linked with the names of DBpedia locations and provided the additional metadata for the feature geometries `X`, `Y`, `admin_boundary`, `geographic_county`, and `postcode`.
+
+The OS Open Names dataset provided additional information for the majority of DBpedia locations, linking was made particularly easy given the presence of a variable in this dataset called `SAME_AS_DBPEDIA` which enabled accurate linking with the DBpedia dataset for the majority of locations. Additional locations were linked by name as with the POI information. The OS Open Names data provides the additional metadata `TYPE`; including _hydrography_, _populatedPlace_, _transportNetwork_, etc. With a more granular `LOCAL_TYPE.` Additionally `feature_easting` and `feature_northing` geometries, `POSTCODE`, `BOROUGH`, `COUNTY` and `COUNTRY`, provided the in depth hierarchical structure as outlined in **Figure \ref{f:hier}**.
+
+## Building the Database
+
+Neo4j is the most popular graph database management system and has been used in previous work relating to the construction of databases for use in geographic natural language processing to semantically link associations between places [@chen2018;@chen2018a;@kim2017].
+
+First constraints were created to ensure no duplicates are created, and to improve the efficiency of the database construction.
+
+\vspace{2mm}
+```{sql, eval=F}
+CREATE CONSTRAINT ON (pc:Postcode) ASSERT pc.name IS UNIQUE;
+CREATE CONSTRAINT ON (b:Borough) ASSERT b.name IS UNIQUE;
+CREATE CONSTRAINT ON (c:County) ASSERT c.name IS UNIQUE;
+CREATE CONSTRAINT ON (cy:Country) ASSERT cy.name IS UNIQUE;
+```
+
+Following this, the complete data including DBpedia descriptions, and OS metadata was read in periodically 10,000 rows at a time to ensure memory constraints were followed. This code snippet shows the creation of the _Location_ node, which includes the `name`, `type`, `X`, `Y`, and `abstract` variables. This was repeated for each of the hierarchical locations contained within the data.
+
+\vspace{2mm}
+```{sql, eval=F}
+USING PERIODIC COMMIT 10000
+LOAD CSV WITH HEADERS FROM "file:///wiki.csv" AS row
+WITH row WHERE NOT row.label IS null
+MERGE (l:Location {name: row.label,
+                   type: row.TYPE,
+                   X: row.GEOMETRY_X,
+                   Y: row.GEOMETRY_Y,
+                   abstract: row.abs})
+RETURN count(l);
+
+..
+```
+
+Creation of the relations between locations and their hierarchical relations is given below, in this case postcodes containing locations:
+
+\vspace{2mm}
+```{sql, eval=F}
+USING PERIODIC COMMIT 10000
+LOAD CSV WITH HEADERS FROM "file:///wiki.csv" AS row
+WITH row.label as lname, row.POSTCODE_DISTRICT AS pcname
+MATCH (l:Location {name: lname})
+MATCH (pc:Postcode {name: pcname})
+MERGE (pc)-[rel:CONTAINS]->(l)
+RETURN count(rel);
+
+..
+```
+
+
+# Results
+
+Of the `r format(nrow(read.csv('~/data/dbpedia/db_descriptions.csv')), big.mark=',')` _Place_ and _Organisation_ labelled results extracted from the United Kingdom (excluding Northern Ireland), `r format(nrow(read.csv('~/data/dbpedia/db_combined.csv')), big.mark=',')` were linked successfully with the OS POI, and OS Open Places data.
+
+The Ordnance Survey POI data contains a total of 4,320,574 results, of which, 70,959 were initially joined based on the DBpedia label. Of these, only 6,646 provided unique abstracts, with analysis revealing that DBpedia places with many repeated entries in the POI inventory included general concepts such as _Guide Post_, and company names like _Premier Inn_. Any ambiguous entry was therefore removed to ensure the abstract was correctly associated with the POI. Following this, the POI inventory provided a total of 5,534 unambiguous results. OS Open Data provided 2,927,487 places, joining using the place name first provided 29,367 results, and following the removal of duplicates, this was reduced down to 13,881. It is noted that place names from DBpedia which include additional information e.g. _Place Name, (County)_ are unlikely to be included through this method. Using the `SAME_AS_DBPEDIA` column enabled the linking of a further 15,122 rows, assumed to be accurate.
+
+# Discussion and Further Work
+
+Previous studies have made use of the various classes DBpedia provides, for example @gao2013 used the `dbpedia-owl:nearestCity` relation in the `City` class to obtain _platial buffers_ for city boundaries. They also note the ability to perform _platial joins_ to obtain total populations of all towns in the Californian County of Santa Barbara by using the `partOf` predicate in relation to the `County` class. Such examples however rely on both the comprehensive coverage of classes and relations, and do not provide the granularity of relations this study was hoping to achieve. It should be noted that it appears that the United States often has more complete and consistent representations on Wikipedia when compared with the United Kingdom. Additionally, @rizzo2015 utilised the ontologies DBpedia provides for entity classification, however, entity recognition work generally considers entities using widely used entity tags, such as those present in the [OntoNotes Release 5.0](https://catalog.ldc.upenn.edu/LDC2013T19).
+
+@scheider2013 discuss the ability to combine Semantic Web reasoning with techniques associated with Geographic Information Retrieval to localise places based on both spatial and semantic relationships found in place descriptions. Namely the relationships found between the place and other places, objects, or activities. Building on this, the work presented in this report could be used for the construction of a semantic gazetteer, first described by @montello2003, with the goal of providing relevant geo-information, extracted from descriptions, in a structured format. Early spatial cognition research identified the semantic associations with place, @lynch1960 for example describes the cognitive concepts that are apparent from sketches of a city, while @scheider2013 note that these concepts are also present within verbal place descriptions, together with the spatial prepositions which link them.
+
+The additional information provided through a semantic gazetteer is considered essential for the ability to both extract and geocode spatial expressions in natural language and to further improve toponym disambiguation techniques. @chen2018 demonstrate the use of graph databases to provide semantic links between spatial relations from place descriptions, where places are nodes, and spatial relationships are edges. @chen2018a note however that by constructing place graphs in such a way, the triples formed do not contain the majority of the additional context. Particularly they note that these place graph models do not consider the additional semantics or related human activities which would prove useful for further spatial reasoning tasks.
+
+@wolter2018 describe in detail the ability to derive information from place descriptions. When presented with a river, humans may perceive the ability for it to be followed, or with a hill, a person may describe going up or down, information which may be present in descriptive language. Spatial relations within descriptions rely on the reference frame of the place, e.g. _"in front of"_ is interpreted differently for a building than for then end of a route, _nearness_ also relies on a understanding of the scale of the place being considered. Human cognitive principles also shape how place is described, however as often is the case, @wolter2018 note that place description and the place itself are likely all that is known. Finally, @wolter2018 note that the language used within a description may provide an indication of the granularity being considered, and further entities being described will also provide further information regarding the place.
+
+@chen2018a take the principals as described by @wolter2018, and use them to further extend the place graph database model, taking all the information provided by place descriptions to form detailed nodes containing detailed semantic information regarding a place. Future work may mirror and build on these concepts, enabled through the data provided in this report, and build towards the construction of a semantic gazetteer.
+
+# References
+\small
