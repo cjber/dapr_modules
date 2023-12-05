@@ -22,15 +22,8 @@ class Agent():
         # initial location of each agent is a random xy location
         # in the environment or if xy is given as an integer 1-100,
         # this is instead used and multiplied by 3
-        if (x is None):
-            self.x: int = random.randint(0, len(self.environment))
-        else:
-            self.x = x*3
-        if (y is None):
-            self.y: int = random.randint(0, len(self.environment[0]))
-        else:
-            self.y = y*3
-
+        self.x = random.randint(0, len(self.environment)) if (x is None) else x*3
+        self.y = random.randint(0, len(self.environment[0])) if (y is None) else y*3
         # initial agent variables
         self.agents = agents
         self.store: int = 10
@@ -48,9 +41,7 @@ class Agent():
         :param agent: Every agent in the model
         :type agent: list()
         """
-        distance = ((self.x - agent.x)**2 +
-                    (self.y - agent.y)**2)**0.5
-        return(distance)
+        return ((self.x - agent.x) ** 2 + (self.y - agent.y) ** 2) ** 0.5
 
     def move(self) -> None:
         """
@@ -58,23 +49,24 @@ class Agent():
         and negative x/y directions
 
         """
-        height: int = len(self.environment)
-        width: int = len(self.environment[0])
-        rand: int = random.randint(1, 5)
-
         # modulus ensures that an agent may not randomly move outside the
         # environment by giving the remainder of the calculation
         # if (self.xy +/- rand) > width/height essentially wraps the agent
         # around the environment
-        if self.dead is not True:
-            if random.random() < 0.5:
-                self.x = (self.x + rand) % width
-            else:
-                self.x = (self.x - rand) % width
-            if random.random() < 0.5:
-                self.y = (self.y + rand) % height
-            else:
-                self.y = (self.y - rand) % height
+        if self.dead is True:
+            return
+        rand: int = random.randint(1, 5)
+
+        width: int = len(self.environment[0])
+        if random.random() < 0.5:
+            self.x = (self.x + rand) % width
+        else:
+            self.x = (self.x - rand) % width
+        height: int = len(self.environment)
+        if random.random() < 0.5:
+            self.y = (self.y + rand) % height
+        else:
+            self.y = (self.y - rand) % height
 
     def eat(self, environment: List[List[int]]) -> None:
         """
@@ -160,20 +152,21 @@ class Agent():
         Larger carnivores eat smaller ones.
 
         """
-        if self.size > 100:
-            self.colour = "red"
-            self.alpha = 1
-            self.preg = 0
-            for agent in self.agents:
-                distance = self.distance_between(agent)
-                if distance < 20:
-                    # the larger carnivore eats the smaller carnivore
-                    if self.store > agent.store & agent.store > 0:
-                        self.store = self.store + agent.store
-                        agent.dead = True
-                        # remove the eaten agent
-                        agent.x = -999
-                        agent.y = -999
-                        print("A predator eats another, gaining", agent.store,
-                              "resources.")
-                        agent.store = 0
+        if self.size <= 100:
+            return
+        self.colour = "red"
+        self.alpha = 1
+        self.preg = 0
+        for agent in self.agents:
+            distance = self.distance_between(agent)
+            if distance < 20:
+                # the larger carnivore eats the smaller carnivore
+                if self.store > agent.store & agent.store > 0:
+                    self.store = self.store + agent.store
+                    agent.dead = True
+                    # remove the eaten agent
+                    agent.x = -999
+                    agent.y = -999
+                    print("A predator eats another, gaining", agent.store,
+                          "resources.")
+                    agent.store = 0

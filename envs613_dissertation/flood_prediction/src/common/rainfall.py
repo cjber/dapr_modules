@@ -18,7 +18,7 @@ stations = gpd.GeoDataFrame(
 )
 
 with jsonlines.open("data/floods/flood_tweets.jsonl", "r") as jl:
-    tweets = pd.DataFrame([tweet for tweet in jl])
+    tweets = pd.DataFrame(list(jl))
 
 dates = tweets["created_at"].str[:-14].unique().tolist()
 

@@ -112,10 +112,9 @@ df_scaled = range_scaler.fit_transform(df[cont_vars])
 df_scaled = pd.DataFrame(df_scaled, index=df.index, columns=cont_vars)
 
 plts = {}
-itr = 0
 df_norms = [df, df_std, df_scaled]
 
-for d in df_norms:
+for itr, d in enumerate(df_norms):
     chss = {}
     for i in range(2, 11):
         estimator = KMeans(n_clusters=i)
@@ -124,8 +123,7 @@ for d in df_norms:
                                       estimator.labels_)
         chss[i] = chs
     plts[itr] = chss
-    itr += 1
-plts = [pd.Series(plts[k]) for k in plts.keys()]
+plts = [pd.Series(plts[k]) for k in plts]
 
 f, ax = plt.subplots(1, 3, figsize=(16, 6))
 [plts[i].plot.line(ax=ax[i]) for i, _ in enumerate(plts)]
@@ -153,8 +151,7 @@ estimator = KMeans(n_clusters=6)
 
 def k5_fits(df):
     estimator.fit(df[cont_vars])
-    k5_fits = pd.Series(estimator.labels_, index=df.index)
-    return k5_fits
+    return pd.Series(estimator.labels_, index=df.index)
 
 
 # fit raw/std/scaled model
@@ -169,8 +166,7 @@ def k5_pca(df):
                               index=df.index,
                               columns=["C-1", "C-2"])
     estimator.fit(components)
-    k5_pca = pd.Series(estimator.labels_, index=components.index)
-    return k5_pca
+    return pd.Series(estimator.labels_, index=components.index)
 
 
 df_pca = [df_std, df_scaled]
@@ -238,13 +234,9 @@ While the score for the raw values is much higher, but all variables are at diff
 
 
 def sil_scores(k5_fits):
-    sil_scores = silhouette_score(
-        df[cont_vars],
-        k5_fits,
-        metric="euclidean",
-        sample_size=10000
+    return silhouette_score(
+        df[cont_vars], k5_fits, metric="euclidean", sample_size=10000
     )
-    return sil_scores
 
 
 sil_score = [sil_scores(fit) for fit in k5_fits]

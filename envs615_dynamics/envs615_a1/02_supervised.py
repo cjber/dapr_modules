@@ -117,11 +117,12 @@ plt.show()
 
 
 def model_performance(metric):
-    series = pd.Series({'Baseline': metric(df['log_price'],
-                                           m1.fittedvalues),
-                        'Minimal': metric(df['log_price'],
-                                          m2.fittedvalues)})
-    return series
+    return pd.Series(
+        {
+            'Baseline': metric(df['log_price'], m1.fittedvalues),
+            'Minimal': metric(df['log_price'], m2.fittedvalues),
+        }
+    )
 
 
 metric = [metrics.r2_score,

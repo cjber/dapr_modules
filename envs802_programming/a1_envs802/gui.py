@@ -38,15 +38,11 @@ def reverse_colourmap(cmap, name='my_cmap_r'):
     for key in cmap._segmentdata:
         k.append(key)
         channel = cmap._segmentdata[key]
-        data = []
-
-        for t in channel:
-            data.append((1-t[0], t[2], t[1]))
+        data = [(1-t[0], t[2], t[1]) for t in channel]
         reverse.append(sorted(data))
 
     LinearL = dict(zip(k, reverse))
-    my_cmap_r = mpl.colors.LinearSegmentedColormap(name, LinearL)
-    return my_cmap_r
+    return mpl.colors.LinearSegmentedColormap(name, LinearL)
 
 
 def create_env(env_file: str) -> List[List[int]]:
@@ -269,7 +265,7 @@ class AgentGUI:
         # allow for saving of the current model step as an image
         if self.save_img == 1 and self.inf == False:
             savename = str(self.current_gen + 1)
-            plt.savefig(savename + ".jpg")
+            plt.savefig(f"{savename}.jpg")
 
     def initial_vars(self, *args: int) -> None:
         """
@@ -293,11 +289,7 @@ class AgentGUI:
         Doing this iteratively preserves the correct order.
 
         """
-        if self.inf == False:
-            self.num_iter = self.num_iter
-        else:
-            self.num_iter = 999999999  # cannot use inf float
-
+        self.num_iter = self.num_iter if self.inf == False else 999999999
         # stop the function if number of iterations are exceeded
         # add one to each current gen for each iteration
         while (self.current_gen < self.num_iter) & (self.carry_on):
@@ -305,7 +297,7 @@ class AgentGUI:
             self.current_gen = self.current_gen + 1
             # append the new image to the list of filenames
             if self.save_img == 1:
-                self.filenames.append(str(self.current_gen) + ".jpg")
+                self.filenames.append(f"{str(self.current_gen)}.jpg")
         # after the gen functions ends, turn images into a gif if selected
         if self.save_img == 1:
             self.create_gif()

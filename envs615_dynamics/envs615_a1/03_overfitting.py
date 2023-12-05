@@ -28,7 +28,7 @@ for i, m in enumerate(res.columns.drop(["Truth", "Truth-Log"])):
                 ci=None,
                 ax=ax
                 )
-f.suptitle(f"Observed Vs Predicted")
+f.suptitle("Observed Vs Predicted")
 plt.show()
 
 r2s = pd.Series({"LM-Raw": r2_score(df["Truth"],
