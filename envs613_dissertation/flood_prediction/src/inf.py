@@ -32,8 +32,7 @@ def load_model(model_path: str):
 
 def load_data(path: Path, batch_size: int):
     data = CSVDataset(path=path, meta=False)
-    dm = DataLoader(data, shuffle=True, batch_size=batch_size)
-    return dm
+    return DataLoader(data, shuffle=True, batch_size=batch_size)
 
 
 def test_model(data, model, keywords):
@@ -46,13 +45,9 @@ def test_model(data, model, keywords):
         text = item["text"][0]
         label = torch.argmax(output["logits"].squeeze()).tolist()
         truth = item["labels"].numpy().item()
-        if any(k in text.lower() for k in keywords):
-            rule = 1
-        else:
-            rule = 0
+        rule = 1 if any(k in text.lower() for k in keywords) else 0
         results.append({"text": text, "pred": label, "truth": truth, "rule": rule})
-    results = pd.DataFrame(results)
-    return results
+    return pd.DataFrame(results)
 
 
 if __name__ == "__main__":

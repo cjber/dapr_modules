@@ -9,7 +9,7 @@ from transformers import AutoTokenizer
 from src.common.utils import preprocess
 
 with jsonlines.open("data/floods/flood_tweets.jsonl", "r") as jl:
-    tweets = pd.DataFrame([tweet for tweet in jl])  # type: ignore
+    tweets = pd.DataFrame(list(jl))
 
 
 def preprocess_tweets(tweets: pd.DataFrame) -> dict[int, pd.DataFrame]:
@@ -20,8 +20,7 @@ def preprocess_tweets(tweets: pd.DataFrame) -> dict[int, pd.DataFrame]:
     tweets["diff_date"] = tweets["created_at"] - tweets["warning_time"]
     tweets = tweets.groupby("idx").filter(lambda x: len(x) > 500)
 
-    tweets_idx = dict(tuple(tweets.groupby("idx")))
-    return tweets_idx
+    return dict(tuple(tweets.groupby("idx")))
 
 
 def build_model(task: str):

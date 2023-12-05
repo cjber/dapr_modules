@@ -67,14 +67,13 @@ class MLP(object):
         for i in reversed(range(len(self.network))):
             layer = self.network[i]
             errors = []
-            if i != len(self.network) - 1:
-                for j in range(len(layer)):
+            for j in range(len(layer)):
+                if i != len(self.network) - 1:
                     error = 0.0
                     for neuron in self.network[i + 1]:
                         error += neuron["weights"][j] * neuron["delta"]
                         errors.append(error)
-            else:
-                for j in range(len(layer)):
+                else:
                     neuron = layer[j]
                     errors.append(label[j] - neuron["output"])
             for j in range(len(layer)):
@@ -95,12 +94,10 @@ class MLP(object):
         for epoch in range(self.num_epochs):
             sum_error = 0
             for point, label in zip(train, labels):
-                if type(label) != list():
+                if type(label) != []:
                     label = [label]
                 outputs = self.forward(point)
-                sum_error += sum(
-                    [(label[i] - outputs[i]) ** 2 for i in range(self.num_outputs)]
-                )
+                sum_error += sum((label[i] - outputs[i]) ** 2 for i in range(self.num_outputs))
                 self.backward(label)
                 self.update_weights(point)
             print(f">epoch={epoch}, error={sum_error}")
